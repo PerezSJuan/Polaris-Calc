@@ -1,5 +1,4 @@
 import os
-import sys
 from pathlib import Path
 
 import flet as ft
@@ -7,11 +6,11 @@ import flet_base.router as fr
 from flet_base.config import flet_config
 from flet_base.translations import instance_translation_manager as tm
 from flet_base.themes import instance_themes as themes
-import flet_base.components.buttons as btn
 import flet_base.components.texts as txt
-import flet_base.components.data_display as dd
-import flet_base.components.inputs as inputs
 
+
+# -----------INPUTS----------------
+from components.topbar import create_topbar
 
 
 def get_assets_dir() -> Path:
@@ -83,14 +82,56 @@ async def Awake(data: fr.DataSystem):
 
 # _____________TOPBAR________________
 @app.shell()
-async def TopBar(data: fr.DataSystem):
-    pass
+async def TopBar(data: fr.DataSystem, view: ft.View) -> ft.View:
+    # Get the topbar component
+    topbar = create_topbar(data.page, themes.actual_theme, tm)
+    
+    # Store original horizontal alignment to apply it to the content area
+    # This ensures the TopBar can STRETCH to full width while content remains centered/aligned as intended
+    original_h_align = view.horizontal_alignment
+    view.horizontal_alignment = ft.CrossAxisAlignment.STRETCH
+    
+    # We want the topbar to be at the very top, so we remove padding from the view
+    view.padding = 0
+    view.spacing = 0
+    
+    # We move the existing controls into a scrollable container with padding
+    content_area = ft.Container(
+        content=ft.Column(
+            view.controls,
+            scroll=ft.ScrollMode.ADAPTIVE,
+            expand=True,
+            spacing=flet_config.default_layout_spacing,
+            horizontal_alignment=original_h_align,  # Restore original page alignment
+        ),
+        padding=20,
+        expand=True,
+    )
+    
+    # Reconstruct view controls: TopBar on top (stretching), then the rest
+    view.controls = [
+        topbar,
+        content_area
+    ]
+    
+    return view
 
 
 #_____________ROUTES________________
 @app.page("/home")
 async def Home(data:fr.DataSystem):
-    data.page.add(txt.body(tm.translate("Acerca de")))
+    return ft.View(
+        route="/home",
+        controls=[
+            txt.body(tm.translate("Acerca de")),
+            # Agrega aquí todos los controles de la página
+            ft.Text("Contenido de la página principal"),
+            ft.Button("Botón de ejemplo"),
+        ],
+        vertical_alignment=ft.MainAxisAlignment.START,
+        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+    )
+
 
 
 
