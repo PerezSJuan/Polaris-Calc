@@ -14,8 +14,9 @@ from components.topbar import create_topbar
 
 
 def get_assets_dir() -> Path:
-    default_assets_dir = Path(__file__).parent / "assets"   # fallback for local runs
+    default_assets_dir = Path(__file__).parent / "assets"  # fallback for local runs
     return Path(os.environ.get("FLET_ASSETS_DIR", str(default_assets_dir))).resolve()
+
 
 # -----------CONFIG-----------------
 flet_config.light_theme = {
@@ -60,10 +61,9 @@ flet_config.default_layout_spacing = 10
 flet_config.default_layout_threshold = 0
 
 
-
-
 # _____________AWAKE APP________________
 app = fr.FletRouter(route_init="/home")
+
 
 @app.middleware
 async def Awake(data: fr.DataSystem):
@@ -74,9 +74,18 @@ async def Awake(data: fr.DataSystem):
     data.page.window.resizable = True
     data.page.window.min_width = 500
     data.page.window.min_height = 0
-    
+
     await tm.awake(data.page)
     await themes.awake(data.page)
+
+    # Registrar pickers una sola vez por sesión
+    if "file_picker_open" not in data.shared:
+        fp_open = ft.FilePicker()
+        fp_save = ft.FilePicker()
+        data.page.services.extend([fp_open, fp_save])
+        data.shared["file_picker_open"] = fp_open
+        data.shared["file_picker_save"] = fp_save
+
     return fr.MiddlewareResult.next()
 
 
@@ -84,17 +93,17 @@ async def Awake(data: fr.DataSystem):
 @app.shell()
 async def TopBar(data: fr.DataSystem, view: ft.View) -> ft.View:
     # Get the topbar component
-    topbar = create_topbar(data.page, themes.actual_theme, tm)
-    
+    topbar = create_topbar(data.page, themes.actual_theme, tm, data.shared)
+
     # Store original horizontal alignment to apply it to the content area
     # This ensures the TopBar can STRETCH to full width while content remains centered/aligned as intended
     original_h_align = view.horizontal_alignment
     view.horizontal_alignment = ft.CrossAxisAlignment.STRETCH
-    
+
     # We want the topbar to be at the very top, so we remove padding from the view
     view.padding = 0
     view.spacing = 0
-    
+
     # We move the existing controls into a scrollable container with padding
     content_area = ft.Container(
         content=ft.Column(
@@ -107,19 +116,16 @@ async def TopBar(data: fr.DataSystem, view: ft.View) -> ft.View:
         padding=20,
         expand=True,
     )
-    
+
     # Reconstruct view controls: TopBar on top (stretching), then the rest
-    view.controls = [
-        topbar,
-        content_area
-    ]
-    
+    view.controls = [topbar, content_area]
+
     return view
 
 
-#_____________ROUTES________________
+# _____________ROUTES________________
 @app.page("/home")
-async def Home(data:fr.DataSystem):
+async def Home(data: fr.DataSystem):
     return ft.View(
         route="/home",
         controls=[
@@ -133,6 +139,14 @@ async def Home(data:fr.DataSystem):
     )
 
 
+@app.page("/settings")
+async def Settings(data: fr.DataSystem):
+    pass
+
+
+@app.page("/editor")
+async def Editor(data: fr.DataSystem):
+    pass
 
 
 # ------------RUN APP----------------
