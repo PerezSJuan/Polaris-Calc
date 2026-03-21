@@ -21,37 +21,77 @@ def create_topbar(page: ft.Page, color_scheme, translation_manager, shared=None)
                 shared[key] = picker
         return picker
 
-    # Handlers for FilePicker result
+    async def handle_new(e):
+        if shared is not None:
+            shared["editor_data"] = [{"name": "V1", "values": []}]
+            shared["current_file_path"] = None
+        if page.route == "/editor":
+            page.go("/home")
+        page.go("/editor")
+        page.update()
+
     async def handle_open(e):
         files = await get_or_create_picker("file_picker_open").pick_files(
             allowed_extensions=["plc"],
             dialog_title=translation_manager.translate("Seleccionar archivo PLC"),
         )
         if files:
-            file_path = files[0].path
-            data = load_plc(file_path)
-            if data:
+            file_path = getattr(files[0], "path", None)
+            if not file_path:
+                page.snack_bar = ft.SnackBar(
+                    ft.Text(translation_manager.translate("No se pudo leer la ruta del archivo"))
+                )
+                page.snack_bar.open = True
+                page.update()
+                return
+            data_loaded = load_plc(file_path)
+            if data_loaded is not None:
+                if shared is not None:
+                    shared["editor_data"] = data_loaded
+                    shared["current_file_path"] = file_path
+                
                 page.snack_bar = ft.SnackBar(
                     ft.Text(f"{translation_manager.translate('Cargado')}: {file_path}")
                 )
                 page.snack_bar.open = True
+                
+                if page.route == "/editor":
+                    page.go("/home")
+                page.go("/editor")
                 page.update()
 
-    async def handle_save(e):
-        file_path = await get_or_create_picker("file_picker_save").save_file(
+    async def handle_save_as(e):
+        saved_file = await get_or_create_picker("file_picker_save").save_file(
             allowed_extensions=["plc"],
-            dialog_title=translation_manager.translate("Guardar archivo PLC"),
+            dialog_title=translation_manager.translate("Guardar archivo PLC como"),
             file_name="matrices.plc",
         )
+        file_path = getattr(saved_file, "path", saved_file) if saved_file else None
         if file_path:
-            dummy_matrices = [[11.5, 22.0, 33.1], [45.2, 5.0, 68.7], [7.8, 81.3, 9.0]]
-            success = save_plc(file_path, dummy_matrices)
+            current_data = shared.get("editor_data", []) if shared else []
+            success = save_plc(file_path, current_data)
             if success:
+                if shared is not None:
+                    shared["current_file_path"] = file_path
                 page.snack_bar = ft.SnackBar(
                     ft.Text(f"{translation_manager.translate('Guardado')}: {file_path}")
                 )
                 page.snack_bar.open = True
                 page.update()
+
+    async def handle_save(e):
+        current_path = shared.get("current_file_path") if shared is not None else None
+        if current_path:
+            current_data = shared.get("editor_data", []) if shared else []
+            success = save_plc(current_path, current_data)
+            if success:
+                page.snack_bar = ft.SnackBar(
+                    ft.Text(f"{translation_manager.translate('Guardado')}: {current_path}")
+                )
+                page.snack_bar.open = True
+                page.update()
+        else:
+            await handle_save_as(e)
 
     return ft.Container(
         bgcolor=bg_color,
@@ -72,7 +112,7 @@ def create_topbar(page: ft.Page, color_scheme, translation_manager, shared=None)
                     controls=[
                         ft.MenuItemButton(
                             content=ft.Text(translation_manager.translate("Nuevo")),
-                            on_click=lambda _: print("Nuevo archivo"),
+                            on_click=handle_new,
                         ),
                         ft.MenuItemButton(
                             content=ft.Text(translation_manager.translate("Abrir")),
@@ -81,6 +121,12 @@ def create_topbar(page: ft.Page, color_scheme, translation_manager, shared=None)
                         ft.MenuItemButton(
                             content=ft.Text(translation_manager.translate("Guardar")),
                             on_click=handle_save,
+                            disabled=page.route != "/editor",
+                        ),
+                        ft.MenuItemButton(
+                            content=ft.Text(translation_manager.translate("Guardar como")),
+                            on_click=handle_save_as,
+                            disabled=page.route != "/editor",
                         ),
                         ft.Divider(),
                         ft.MenuItemButton(

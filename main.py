@@ -11,6 +11,7 @@ import flet_base.components.texts as txt
 
 # -----------INPUTS----------------
 from components.topbar import create_topbar
+from screens.editor.editor import EditorScreen
 
 
 def get_assets_dir() -> Path:
@@ -69,7 +70,12 @@ app = fr.FletRouter(route_init="/home")
 async def Awake(data: fr.DataSystem):
     data.page.title = "Polaris Calc"
     data.page.scroll = ft.ScrollMode.ADAPTIVE
-    data.page.fonts = os.path.join(get_assets_dir(), "fonts", "ComicNeue-Regular.ttf")
+    data.page.fonts = {
+        "Regular":os.path.join(get_assets_dir(), "fonts", "ComicNeue-Regular.ttf"),
+        "Bold": os.path.join(get_assets_dir(), "fonts", "ComicNeue-Bold.ttf"),
+        "Italic": os.path.join(get_assets_dir(), "fonts", "ComicNeue-Italic.ttf"),
+        "BoldItalic": os.path.join(get_assets_dir(), "fonts", "ComicNeue-BoldItalic.ttf"),
+    }
     data.page.window.icon = os.path.join(get_assets_dir(), "icons", "icon.png")
     data.page.window.resizable = True
     data.page.window.min_width = 500
@@ -132,7 +138,10 @@ async def Home(data: fr.DataSystem):
             txt.body(tm.translate("Acerca de")),
             # Agrega aquí todos los controles de la página
             ft.Text("Contenido de la página principal"),
-            ft.Button("Botón de ejemplo"),
+            ft.Button(
+                "Ir al Editor", 
+                on_click=lambda _: data.page.go("/editor")
+            ),
         ],
         vertical_alignment=ft.MainAxisAlignment.START,
         horizontal_alignment=ft.CrossAxisAlignment.CENTER,
@@ -146,7 +155,7 @@ async def Settings(data: fr.DataSystem):
 
 @app.page("/editor")
 async def Editor(data: fr.DataSystem):
-    pass
+    return await EditorScreen(data, themes)
 
 
 # ------------RUN APP----------------
