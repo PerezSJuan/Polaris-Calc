@@ -1,6 +1,7 @@
 import flet as ft
 import flet_base.router as fr
 from flet_base.translations import instance_translation_manager as tm
+import flet_base.components.texts as txt
 
 
 def normalize_editor_data(raw_data):
@@ -49,17 +50,27 @@ class DataColumn(ft.Column):
         self.build_column()
 
     def build_column(self):
-        # Header (Column Name)
+        self.header_display = ft.Container(
+            content=txt.markdown(f"$${self.header}$$", size=14),
+            alignment=ft.Alignment.CENTER,
+            height=40,
+            on_click=self.start_edit_header,
+            tooltip=tm.translate("Clic para editar nombre"),
+        )
+
         self.header_field = ft.TextField(
             label=f"Col {self.index + 1}",
             value=self.header,
             text_align=ft.TextAlign.CENTER,
             dense=True,
             height=40,
-            on_change=self.handle_cell_change,
+            visible=False,
+            on_blur=self.finish_edit_header,
+            on_submit=self.finish_edit_header,
         )
 
         self.controls = [
+            self.header_display,
             self.header_field,
             ft.Divider(height=1, thickness=1),
         ]
@@ -94,6 +105,21 @@ class DataColumn(ft.Column):
         if self.on_change:
             self.on_change()
 
+    def start_edit_header(self, e):
+        self.header_display.visible = False
+        self.header_field.visible = True
+        self.header_field.focus()
+        self.update()
+
+    def finish_edit_header(self, e):
+        self.header = self.header_field.value or f"V{self.index + 1}"
+        self.header_display.content = txt.markdown(f"$${self.header}$$", size=14)
+        self.header_display.visible = True
+        self.header_field.visible = False
+        self.update()
+        if self.on_change:
+            self.on_change()
+
     def add_row(self, e=None):
         self.rows_container.controls.append(self.create_cell(""))
         self.update()
@@ -112,7 +138,7 @@ class DataColumn(ft.Column):
 
     def get_column_data(self):
         return {
-            "name": self.header_field.value or f"V{self.index + 1}",
+            "name": self.header,
             "values": self.get_data(),
         }
 
@@ -192,7 +218,9 @@ async def EditorScreen(data: fr.DataSystem, themes):
                     icon_color=themes.actual_theme["primary"],
                 ),
                 ft.Text(
-                    tm.translate("Nueva Columna"), size=12, text_align=ft.TextAlign.CENTER
+                    tm.translate("Nueva Columna"),
+                    size=12,
+                    text_align=ft.TextAlign.CENTER,
                 ),
             ],
             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
