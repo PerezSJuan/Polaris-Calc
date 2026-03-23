@@ -1,29 +1,3 @@
-"""The utility module for unit conversion."""
-
-# Standard SI Prefixes (Base 10)
-prefixes = {
-    "Y": 1e24,  # yotta
-    "Z": 1e21,  # zetta
-    "E": 1e18,  # exa
-    "P": 1e15,  # peta
-    "T": 1e12,  # tera
-    "G": 1e9,  # giga
-    "M": 1e6,  # mega
-    "k": 1e3,  # kilo
-    "h": 1e2,  # hecto
-    "da": 1e1,  # deca
-    "d": 1e-1,  # deci
-    "c": 1e-2,  # centi
-    "m": 1e-3,  # milli
-    "u": 1e-6,  # micro ('u' used for ASCII compatibility)
-    "n": 1e-9,  # nano
-    "p": 1e-12,  # pico
-    "f": 1e-15,  # femto
-    "a": 1e-18,  # atto
-    "z": 1e-21,  # zepto
-    "y": 1e-24,  # yocto
-}
-
 # Default units grouped by physical dimension
 default_units = {
     "Length": {
@@ -52,24 +26,24 @@ default_units = {
     },
     "Mass": {
         "g": {
-            "factor": 1.0,
+            "factor": 0.001,
             "use_prefixes": True,
-        },  # Base for Grams (kg, mg, ug detected automatically)
+        },  # Prefix base is g (factor 0.001 kg), so kg = 1.0
         "ton": {
-            "factor": 1e6,
+            "factor": 1000.0,
             "use_prefixes": False,
-        },  # Metric ton (fixed as 1e6 grams)
-        "lb": {"factor": 453.59237, "use_prefixes": False},
-        "oz": {"factor": 28.349523, "use_prefixes": False},
-        "st": {"factor": 6350.29318, "use_prefixes": False},
-        "slug": {"factor": 14593.9029, "use_prefixes": False},
-        "gr": {"factor": 0.06479891, "use_prefixes": False},
-        "carat": {"factor": 0.2, "use_prefixes": False},
-        "amu": {"factor": 1.660539e-24, "use_prefixes": False},
-        "ton_us": {"factor": 907184.74, "use_prefixes": False},
-        "ton_uk": {"factor": 1016046.9088, "use_prefixes": False},
-        "qtr": {"factor": 12700.58636, "use_prefixes": False},
-        "cwt": {"factor": 45359.237, "use_prefixes": False},
+        },  # Metric ton (1000 kg)
+        "lb": {"factor": 0.45359237, "use_prefixes": False},
+        "oz": {"factor": 0.028349523, "use_prefixes": False},
+        "st": {"factor": 6.35029318, "use_prefixes": False},
+        "slug": {"factor": 14.5939029, "use_prefixes": False},
+        "gr": {"factor": 0.00006479891, "use_prefixes": False},
+        "carat": {"factor": 0.0002, "use_prefixes": False},
+        "amu": {"factor": 1.660539e-27, "use_prefixes": False},
+        "ton_us": {"factor": 907.18474, "use_prefixes": False},
+        "ton_uk": {"factor": 1016.0469088, "use_prefixes": False},
+        "qtr": {"factor": 12.70058636, "use_prefixes": False},
+        "cwt": {"factor": 45.359237, "use_prefixes": False},
     },
     "Time": {
         "s": {"factor": 1.0, "use_prefixes": False},
@@ -130,15 +104,15 @@ default_units = {
         "barn": {
             "factor": 1e-28,
             "use_prefixes": True,
-        },  # Con prefijos (mbarn, µbarn, etc.)
+        },  # With prefixes (mbarn, µbarn, etc.)
         "are": {
             "factor": 100.0,
             "use_prefixes": True,
-        },  # Con prefijos (hectare, decare, etc.)
+        },  # With prefixes (hectare, decare, etc.)
     },
     "Volume": {
         "m3": {"factor": 1.0, "use_prefixes": True},
-        "l": {"factor": 0.001, "use_prefixes": True},  # Litro con prefijos
+        "l": {"factor": 0.001, "use_prefixes": True},  # Liter with prefixes
         "gal": {"factor": 0.00378541, "use_prefixes": False},
         "gal_uk": {"factor": 0.00454609, "use_prefixes": False},
         "qt": {"factor": 0.000946353, "use_prefixes": False},
@@ -177,7 +151,7 @@ default_units = {
         "therm": {"factor": 1.055056e8, "use_prefixes": False},
         "erg": {"factor": 1e-7, "use_prefixes": True},
         "foe": {"factor": 1e44, "use_prefixes": False},
-        "ton_tnt": {"factor": 4.184e9, "use_prefixes": True},  # Con prefijos (kt, Mt)
+        "ton_tnt": {"factor": 4.184e9, "use_prefixes": True},  # With prefixes (kt, Mt)
     },
     "Power": {
         "W": {"factor": 1.0, "use_prefixes": True},
@@ -238,7 +212,7 @@ default_units = {
         "sextant": {"factor": 1.04719755, "use_prefixes": False},
     },
     "Solid Angle": {
-        "sr": {"factor": 1.0, "use_prefixes": True},  # Steradian con prefijos
+        "sr": {"factor": 1.0, "use_prefixes": True},  # Steradian with prefixes
         "deg2": {"factor": 0.000304617, "use_prefixes": False},  # Square degree
         "sp": {"factor": 12.56637, "use_prefixes": False},  # Sphere
         "hemisphere": {"factor": 6.283185, "use_prefixes": False},
@@ -308,7 +282,7 @@ default_units = {
         "mpg_uk": {"factor": 0.354006, "use_prefixes": False},
     },
     "Concentration": {
-        "mol/L": {"factor": 1.0, "use_prefixes": True},  # Molaridad con prefijos
+        "mol/L": {"factor": 1.0, "use_prefixes": True},  # Molarity with prefixes
         "M": {"factor": 1.0, "use_prefixes": True},  # Molar
         "ppm": {"factor": 0.001, "use_prefixes": False},
         "ppb": {"factor": 1e-6, "use_prefixes": False},
@@ -407,7 +381,7 @@ default_units = {
         "pc": {
             "factor": 3.08567758e16,
             "use_prefixes": True,
-        },  # Parsec con prefijos (kpc, Mpc)
+        },  # Parsec with prefixes (kpc, Mpc)
         "au": {"factor": 1.495978707e11, "use_prefixes": False},
         "R_sun": {"factor": 6.96e8, "use_prefixes": False},
         "R_earth": {"factor": 6371000.0, "use_prefixes": False},
@@ -417,7 +391,7 @@ default_units = {
         "Jy": {"factor": 1e-26, "use_prefixes": True},  # Jansky
     },
     "Particle Physics": {
-        "barn": {"factor": 1e-28, "use_prefixes": True},  # Barn con prefijos
+        "barn": {"factor": 1e-28, "use_prefixes": True},  # Barn with prefixes
     },
     "Chemical Amount": {
         "mol": {"factor": 1.0, "use_prefixes": True},
@@ -432,7 +406,7 @@ default_units = {
         "stick_butter": {"factor": 0.113398, "use_prefixes": False},
     },
     "Textiles": {
-        "tex": {"factor": 1e-6, "use_prefixes": True},  # Tex con prefijos (dtex)
+        "tex": {"factor": 1e-6, "use_prefixes": True},  # Tex with prefixes (dtex)
         "den": {"factor": 1.11111e-7, "use_prefixes": False},  # Denier
         "Nm": {"factor": 0.001, "use_prefixes": False},  # Metric count
         "Ne": {"factor": 0.00059055, "use_prefixes": False},  # Cotton count
@@ -474,134 +448,3 @@ default_units = {
         "gon": {"factor": 0.01570796, "use_prefixes": False},
     },
 }
-
-
-def _get_base_unit_info(
-    unit_symbol: str, unit_collection: dict = default_units
-) -> dict:
-    """Internal helper to find a unit in a unit collection dictionary."""
-    for category, units in unit_collection.items():
-        if unit_symbol in units:
-            return units[unit_symbol]
-    return None
-
-
-def get_unit_info(unit_str: str, unit_collection: dict = default_units) -> dict:
-    """Public helper to get unit information, supporting prefixes automatically."""
-    # 1. Exact match (e.g., KB)
-    info = _get_base_unit_info(unit_str, unit_collection)
-    if info:
-        return info
-
-    # 2. Try prefix parsing (e.g., km)
-    p, b, f = parse_unit_with_prefix(unit_str, unit_collection)
-    if b:
-        base_info = _get_base_unit_info(b, unit_collection)
-        return {
-            "factor": f,
-            "use_prefixes": False,
-            "base_unit": b,
-            "prefix": p,
-            "offset": base_info.get("offset", 0.0),
-        }
-    return None
-
-
-def get_unit_type(unit_str: str, unit_collection: dict = default_units) -> str:
-    """Get the physical dimension (category) of a unit, supporting prefixes."""
-    # 1. Try exact match first
-    for category, units in unit_collection.items():
-        if unit_str in units:
-            return category
-
-    # 2. Try parsing with prefix
-    _, base_unit, _ = parse_unit_with_prefix(unit_str, unit_collection)
-    if base_unit:
-        for category, units in unit_collection.items():
-            if base_unit in units:
-                return category
-    return None
-
-
-def parse_unit_with_prefix(
-    unit_str: str, unit_collection: dict = default_units
-) -> tuple:
-    """Parse a unit string with an optional SI prefix."""
-    # 1. Check for an exact match first
-    unit_info = _get_base_unit_info(unit_str, unit_collection)
-    if unit_info:
-        return "", unit_str, unit_info["factor"]
-
-    # 2. Check for SI prefix
-    for prefix, value in prefixes.items():
-        if unit_str.startswith(prefix):
-            unit_name = unit_str[len(prefix) :]
-            unit_info = _get_base_unit_info(unit_name, unit_collection)
-            if unit_info and unit_info.get("use_prefixes", False):
-                return prefix, unit_name, value * unit_info["factor"]
-
-    return None, None, None
-
-
-def convert_units(
-    value: float, from_unit: str, to_unit: str, unit_collection: dict = default_units
-) -> float:
-    """Convert a value between two units of the same physical dimension."""
-    p1, u1, f1 = parse_unit_with_prefix(from_unit, unit_collection)
-    p2, u2, f2 = parse_unit_with_prefix(to_unit, unit_collection)
-
-    if u1 is None or u2 is None:
-        raise ValueError(f"Unknown unit: {from_unit if u1 is None else to_unit}")
-
-    if from_unit == to_unit:
-        return value
-
-    type1 = get_unit_type(from_unit, unit_collection)
-    type2 = get_unit_type(to_unit, unit_collection)
-
-    if type1 != type2:
-        raise ValueError(
-            f"Dimensional mismatch: Cannot convert {type1} ({from_unit}) to {type2} ({to_unit})"
-        )
-
-    # Get internal data
-    info1 = _get_base_unit_info(u1, unit_collection)
-    info2 = _get_base_unit_info(u2, unit_collection)
-
-    # 1. Transform from original unit to the internal base system (considering prefixes and offsets)
-    base_val = (value * f1) + info1.get("offset", 0.0)
-
-    # 2. Transform from base system to target unit
-    conversion = (base_val - info2.get("offset", 0.0)) / f2
-
-    return conversion
-
-
-if __name__ == "__main__":
-    while True:
-        print("\n--- Unit Conversor Tester ---")
-        print("Choose an option:")
-        print("1. Parse unit")
-        print("2. Convert units")
-        print("Type 'exit' to quit.")
-
-        choice = input().strip()
-        if choice == "exit":
-            break
-
-        if choice == "1":
-            unit = input("Enter unit (e.g., 'km'): ").strip()
-            print(f"Parsing: {parse_unit_with_prefix(unit)}")
-            print(f"Type: {get_unit_type(unit)}")
-            print(f"Info: {get_unit_info(unit)}")
-        elif choice == "2":
-            try:
-                val = float(input("Value: "))
-                f = input("From unit: ").strip()
-                t = input("To unit: ").strip()
-                res = convert_units(val, f, t)
-                print(f"Result: {val} {f} = {res} {t}")
-            except ValueError as ve:
-                print(f"Input Error: {ve}")
-            except Exception as e:
-                print(f"Error: {e}")
