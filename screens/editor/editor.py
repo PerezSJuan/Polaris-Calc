@@ -1,7 +1,7 @@
 import flet as ft
 import flet_base.router as fr
 from flet_base.translations import instance_translation_manager as tm
-import flet_base.components.texts as txt
+from flet_base.components.inputs import dropdown
 
 
 def normalize_editor_data(raw_data):
@@ -37,60 +37,102 @@ def normalize_editor_data(raw_data):
     return normalized
 
 
-class DataColumn(ft.Column):
-    def __init__(self, index, data=None, header=None, on_change=None):
-        super().__init__(expand=False)
-        self.index = index
-        self._data = data if data is not None else []
-        self.header = header if header else f"V{self.index + 1}"
+class EditableColumn(ft.Container):
+    def __init__(self, pool, current_name, on_change, available_vars_getter, themes):
+        super().__init__()
+        self.pool = pool  # Dict of {name: values}
+        self.current_name = current_name
         self.on_change = on_change
-        self.controls = []
-        self.width = 150
-        self.spacing = 5
-        self.build_column()
+        self.available_vars_getter = available_vars_getter
+        self.themes = themes
 
-    def build_column(self):
-        self.header_display = ft.Container(
-            content=txt.markdown(f"$${self.header}$$", size=14),
-            alignment=ft.Alignment.CENTER,
-            height=40,
-            on_click=self.start_edit_header,
-            tooltip=tm.translate("Clic para editar nombre"),
+        self.width = 180
+        self.padding = 15
+        self.border_radius = 12
+        self.bgcolor = ft.Colors.with_opacity(0.05, themes.actual_theme["on_surface"])
+        self.border = ft.border.all(
+            1, ft.Colors.with_opacity(0.1, themes.actual_theme["on_surface"])
         )
 
-        self.header_field = ft.TextField(
-            label=f"Col {self.index + 1}",
-            value=self.header,
-            text_align=ft.TextAlign.CENTER,
-            dense=True,
-            height=40,
-            visible=False,
-            on_blur=self.finish_edit_header,
-            on_submit=self.finish_edit_header,
+        self.build_ui()
+
+    def build_ui(self):
+        # Dropdown for selecting which variable this column represents
+        self.var_dropdown = dropdown(
+            label=tm.translate("Variable"),
+            options=self.get_options(),
+            value=self.current_name,
+            on_change=self.handle_var_switch,
         )
 
-        self.controls = [
-            self.header_display,
-            self.header_field,
-            ft.Divider(height=1, thickness=1),
-        ]
+        # Container for rows
+        self.rows_col = ft.Column(spacing=8, scroll=ft.ScrollMode.ADAPTIVE)
+        self.load_data()
 
-        # Rows
-        self.rows_container = ft.Column(spacing=2)
-        for val in self._data:
-            self.rows_container.controls.append(self.create_cell(val))
-
-        self.controls.append(self.rows_container)
-
-        # Add Row Button
-        self.controls.append(
-            ft.IconButton(
-                icon=ft.Icons.ADD,
-                on_click=self.add_row,
-                tooltip=tm.translate("Agregar fila"),
-                icon_size=16,
-            )
+        # Add row button
+        self.add_row_btn = ft.IconButton(
+            icon=ft.Icons.ADD_CIRCLE_OUTLINE,
+            on_click=self.add_row,
+            icon_size=24,
+            tooltip=tm.translate("Agregar fila"),
+            icon_color=self.themes.actual_theme["primary"],
         )
+
+        self.content = ft.Column(
+            [
+                ft.Row(
+                    [
+                        ft.Icon(
+                            ft.Icons.TABLE_CHART_OUTLINED,
+                            size=20,
+                            color=self.themes.actual_theme["secondary"],
+                        ),
+                        ft.Text(
+                            tm.translate("Variable"),
+                            size=12,
+                            weight=ft.FontWeight.W_500,
+                        ),
+                    ],
+                    spacing=5,
+                ),
+                self.var_dropdown,
+                ft.Divider(
+                    height=10,
+                    thickness=0.5,
+                    color=ft.Colors.with_opacity(
+                        0.1, self.themes.actual_theme["on_surface"]
+                    ),
+                ),
+                ft.Container(
+                    content=self.rows_col, height=350
+                ),  # Max height for visual sanity
+                ft.Row([self.add_row_btn], alignment=ft.MainAxisAlignment.CENTER),
+            ],
+            spacing=10,
+        )
+
+    def get_options(self):
+        return [ft.dropdown.Option(name) for name in self.available_vars_getter()]
+
+    def update_dropdown(self):
+        self.var_dropdown.options = self.get_options()
+        self.var_dropdown.value = self.current_name
+        try:
+            self.update()
+        except RuntimeError:
+            pass
+
+    def load_data(self):
+        self.rows_col.controls.clear()
+        values = self.pool.get(self.current_name, [])
+        for val in values:
+            self.rows_col.controls.append(self.create_cell(val))
+        if len(values) == 0:
+            self.add_row(None)
+        try:
+            self.update()
+        except RuntimeError:
+            pass
 
     def create_cell(self, value):
         return ft.TextField(
@@ -99,177 +141,201 @@ class DataColumn(ft.Column):
             height=35,
             text_align=ft.TextAlign.RIGHT,
             on_change=self.handle_cell_change,
+            border=ft.InputBorder.NONE,
+            bgcolor=ft.Colors.with_opacity(
+                0.05, self.themes.actual_theme["on_surface"]
+            ),
+            border_radius=6,
+            text_size=13,
+            content_padding=ft.padding.symmetric(horizontal=10),
         )
 
+    def handle_var_switch(self, e):
+        self.sync_pool()  # Save old one first
+        self.current_name = self.var_dropdown.value
+        self.load_data()
+        self.on_change()
+
     def handle_cell_change(self, e):
-        if self.on_change:
-            self.on_change()
+        self.sync_pool()
+        self.on_change()
 
-    def start_edit_header(self, e):
-        self.header_display.visible = False
-        self.header_field.visible = True
-        self.header_field.focus()
-        self.update()
+    def add_row(self, e):
+        self.rows_col.controls.append(self.create_cell(""))
+        self.sync_pool()
+        self.on_change()
+        try:
+            self.update()
+        except RuntimeError:
+            pass
 
-    def finish_edit_header(self, e):
-        self.header = self.header_field.value or f"V{self.index + 1}"
-        self.header_display.content = txt.markdown(f"$${self.header}$$", size=14)
-        self.header_display.visible = True
-        self.header_field.visible = False
-        self.update()
-        if self.on_change:
-            self.on_change()
-
-    def add_row(self, e=None):
-        self.rows_container.controls.append(self.create_cell(""))
-        self.update()
-        if self.on_change:
-            self.on_change()
-
-    def get_data(self):
+    def sync_pool(self):
         data = []
-        for ctrl in self.rows_container.controls:
-            try:
-                val = float(ctrl.value) if ctrl.value else 0.0
-                data.append(val)
-            except ValueError:
-                data.append(0.0)
-        return data
+        for ctrl in self.rows_col.controls:
+            if isinstance(ctrl, ft.TextField):
+                try:
+                    val = float(ctrl.value) if ctrl.value else 0.0
+                    data.append(val)
+                except ValueError:
+                    data.append(0.0)
+        self.pool[self.current_name] = data
 
-    def get_column_data(self):
+    def get_export_data(self):
         return {
-            "name": self.header,
-            "values": self.get_data(),
+            "name": self.current_name,
+            "values": self.pool.get(self.current_name, []),
         }
-
-    def set_data(self, data):
-        self._data = data
-        self.rows_container.controls.clear()
-        for val in data:
-            self.rows_container.controls.append(self.create_cell(val))
-        self.update()
 
 
 async def EditorScreen(data: fr.DataSystem, themes):
-    data.shared["editor_data"] = normalize_editor_data(data.shared.get("editor_data"))
+    # Prepare shared data
+    raw_data = normalize_editor_data(data.shared.get("editor_data", []))
 
-    # Container for all columns
-    columns_row = ft.Row(
+    # We use a central pool (dict) for synchronization
+    # pool: { "V1": [1,2,3], "V2": [...] }
+    pool = {col["name"]: col["values"] for col in raw_data}
+
+    # Visual columns track which variable they are currently showing
+    # We'll initialize one UI column for each item in the pool initially
+    initial_ui_configs = [col["name"] for col in raw_data]
+
+    columns_container = ft.Row(
         scroll=ft.ScrollMode.ADAPTIVE,
         vertical_alignment=ft.CrossAxisAlignment.START,
         spacing=20,
     )
 
-    def on_data_changed():
-        # Update shared state
-        matrices = []
-        for col_ctrl in columns_row.controls:
-            if isinstance(col_ctrl, DataColumn):
-                matrices.append(col_ctrl.get_column_data())
-        data.shared["editor_data"] = matrices
+    def get_available_vars():
+        return list(pool.keys())
 
-    def add_column(e=None):
-        idx = len([c for c in columns_row.controls if isinstance(c, DataColumn)])
-        new_col = DataColumn(index=idx, header=f"V{idx + 1}", on_change=on_data_changed)
-        # Shift the "+" button to the end
-        if len(columns_row.controls) > 0:
-            columns_row.controls.insert(len(columns_row.controls) - 1, new_col)
-        else:
-            columns_row.controls.append(new_col)
-        on_data_changed()
-        columns_row.update()
+    def update_shared_state():
+        # Export the current state of the pool
+        # Filter: only variables that have names
+        # Note: If multiple UI columns edit the same variable, 'pool' already has the latest sync.
+        export_list = []
+        for name, values in pool.items():
+            export_list.append({"name": name, "values": values})
+        data.shared["editor_data"] = export_list
+
+    def on_column_data_changed():
+        update_shared_state()
+
+    def add_ui_column(e=None):
+        # Create a new variable in the pool if needed
+        idx = 1
+        new_name = f"V{len(pool) + 1}"
+        while new_name in pool:
+            idx += 1
+            new_name = f"V{len(pool) + idx}"
+
+        pool[new_name] = []
+
+        # Add a new UI column bound to this new variable
+        new_col = EditableColumn(
+            pool=pool,
+            current_name=new_name,
+            on_change=on_column_data_changed,
+            available_vars_getter=get_available_vars,
+            themes=themes,
+        )
+        columns_container.controls.append(new_col)
+
+        # Refresh all existing column dropdowns because a new variable is available
+        refresh_all_dropdowns()
+        update_shared_state()
+        columns_container.update()
+
+    def refresh_all_dropdowns():
+        for ctrl in columns_container.controls:
+            if isinstance(ctrl, EditableColumn):
+                ctrl.update_dropdown()
 
     def clear_all(e=None):
-        columns_row.controls.clear()
-        data.shared["editor_data"] = [{"name": "V1", "values": []}]
-        for i, col_data in enumerate(data.shared["editor_data"]):
-            columns_row.controls.append(
-                DataColumn(
-                    index=i,
-                    data=col_data.get("values", []),
-                    header=col_data.get("name", f"V{i + 1}"),
-                    on_change=on_data_changed,
-                )
-            )
-        columns_row.controls.append(add_col_btn)
-        on_data_changed()
-        columns_row.update()
+        pool.clear()
+        pool["V1"] = []
+        columns_container.controls.clear()
+        # Add one initial column
+        add_ui_column()
+        update_shared_state()
+        columns_container.update()
 
-    # Initialize columns from shared data
-    for i, col_data in enumerate(data.shared["editor_data"]):
-        columns_row.controls.append(
-            DataColumn(
-                index=i,
-                data=col_data.get("values", []),
-                header=col_data.get("name", f"V{i + 1}"),
-                on_change=on_data_changed,
+    # Build initial UI
+    for name in initial_ui_configs:
+        columns_container.controls.append(
+            EditableColumn(
+                pool=pool,
+                current_name=name,
+                on_change=on_column_data_changed,
+                available_vars_getter=get_available_vars,
+                themes=themes,
             )
         )
 
-    # Button to add new column
-    add_col_btn = ft.Container(
-        content=ft.Column(
-            [
-                ft.IconButton(
-                    icon=ft.Icons.ADD_CIRCLE_OUTLINE,
-                    on_click=add_column,
-                    icon_size=40,
-                    tooltip=tm.translate("Agregar columna"),
-                    icon_color=themes.actual_theme["primary"],
-                ),
-                ft.Text(
-                    tm.translate("Nueva Columna"),
-                    size=12,
-                    text_align=ft.TextAlign.CENTER,
-                ),
-            ],
-            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-            alignment=ft.MainAxisAlignment.CENTER,
-        ),
-        width=150,
-        height=150,
-        border=ft.border.all(1, ft.Colors.with_opacity(0.1, ft.Colors.ON_SURFACE)),
-        border_radius=10,
-        margin=ft.margin.only(top=50),
+    # Top Buttons Row
+    action_buttons = ft.Row(
+        [
+            ft.TextButton(
+                tm.translate("Atrás"),
+                icon=ft.Icons.CHEVRON_LEFT,
+                on_click=lambda _: data.page.go("/home"),
+            ),
+            ft.Row(
+                [
+                    ft.ElevatedButton(
+                        tm.translate("Agregar columna"),
+                        icon=ft.Icons.ADD_BOX_OUTLINED,
+                        on_click=add_ui_column,
+                        style=ft.ButtonStyle(
+                            color={"": themes.actual_theme["on_primary"]},
+                            bgcolor={"": themes.actual_theme["primary"]},
+                        ),
+                    ),
+                    ft.ElevatedButton(
+                        tm.translate("Limpiar todo"),
+                        icon=ft.Icons.DELETE_SWEEP_OUTLINED,
+                        on_click=clear_all,
+                        color=ft.Colors.ERROR,
+                    ),
+                ],
+                spacing=10,
+            ),
+        ],
+        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
     )
-    columns_row.controls.append(add_col_btn)
 
     return ft.View(
         route="/editor",
+        padding=30,
         controls=[
-            ft.Row(
+            ft.Column(
                 [
                     ft.Text(
                         tm.translate("Editor de Matrices"),
-                        size=28,
-                        weight=ft.FontWeight.BOLD,
+                        size=36,
+                        weight=ft.FontWeight.W_800,
+                        # Use a subtle gradient or highlight if possible
                     ),
-                    ft.Row(
-                        [
-                            ft.ElevatedButton(
-                                tm.translate("Atrás"),
-                                icon=ft.Icons.ARROW_BACK,
-                                on_click=lambda _: data.page.go("/home"),
-                            ),
-                            ft.ElevatedButton(
-                                tm.translate("Limpiar todo"),
-                                icon=ft.Icons.DELETE_SWEEP,
-                                on_click=clear_all,
-                                color=ft.Colors.ERROR,
-                            ),
-                        ],
-                        spacing=10,
+                    ft.Text(
+                        tm.translate("Gestiona y edita tus vectores de datos"),
+                        size=16,
+                        color=ft.Colors.with_opacity(
+                            0.6, themes.actual_theme["on_surface"]
+                        ),
                     ),
                 ],
-                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                spacing=5,
             ),
-            ft.Divider(height=20),
+            ft.Divider(height=20, thickness=0.5),
+            action_buttons,
+            ft.Container(height=20),
             ft.Container(
-                content=columns_row,
+                content=columns_container,
                 expand=True,
-                padding=20,
-                border_radius=10,
-                bgcolor=ft.Colors.with_opacity(0.02, ft.Colors.ON_SURFACE),
+                padding=10,
+                border_radius=15,
+                bgcolor=ft.Colors.with_opacity(
+                    0.01, themes.actual_theme["on_background"]
+                ),
             ),
         ],
     )
