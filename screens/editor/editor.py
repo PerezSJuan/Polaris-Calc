@@ -2,10 +2,37 @@ import flet as ft
 import flet_base.router as fr
 from flet_base.translations import instance_translation_manager as tm
 from flet_base.components.inputs import dropdown
+import flet_base.components.texts as txt
+import importlib.util
+from pathlib import Path
+
+
+def load_default_units():
+    """Dynamically load default_units from the utils directory."""
+    try:
+        # Expected path: utils/math utils/unit conversor/default_units.py
+        root = Path(__file__).parents[2]
+        units_path = (
+            root / "utils" / "math utils" / "unit conversor" / "default_units.py"
+        )
+
+        if not units_path.exists():
+            return {}
+
+        spec = importlib.util.spec_from_file_location("default_units", str(units_path))
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return getattr(module, "default_units", {})
+    except Exception as e:
+        print(f"Error loading units: {e}")
+        return {}
+
+
+default_units = load_default_units()
 
 
 def normalize_editor_data(raw_data):
-    """Normalize editor data to [{name: str, values: list}] format."""
+    """Normalize editor data to [{name: str, values: list, magnitude: str, unit: str}] format."""
     normalized = []
 
     if isinstance(raw_data, dict):
@@ -23,16 +50,27 @@ def normalize_editor_data(raw_data):
                 col_values = (
                     column.get("data") if isinstance(column.get("data"), list) else []
                 )
+            col_mag = column.get("magnitude", "none")
+            col_unit = column.get("unit", "none")
         elif isinstance(column, list):
             col_name = f"V{i + 1}"
             col_values = column
+            col_mag = "none"
+            col_unit = "none"
         else:
             continue
 
-        normalized.append({"name": str(col_name), "values": col_values})
+        normalized.append(
+            {
+                "name": str(col_name),
+                "values": col_values,
+                "magnitude": col_mag,
+                "unit": col_unit,
+            }
+        )
 
     if not normalized:
-        normalized = [{"name": "V1", "values": []}]
+        normalized = [{"name": "V1", "values": [], "magnitude": "none", "unit": "none"}]
 
     return normalized
 
@@ -40,7 +78,7 @@ def normalize_editor_data(raw_data):
 class EditableColumn(ft.Container):
     def __init__(self, pool, current_name, on_change, available_vars_getter, themes):
         super().__init__()
-        self.pool = pool  # Dict of {name: values}
+        self.pool = pool  # Dict of {name: {"values": list, "magnitude": str, "unit": str}}
         self.current_name = current_name
         self.on_change = on_change
         self.available_vars_getter = available_vars_getter
@@ -57,12 +95,35 @@ class EditableColumn(ft.Container):
         self.build_ui()
 
     def build_ui(self):
+        # Header text (LaTeX style)
+        self.header_display = txt.markdown(self.get_latex_header(), size=14)
+
         # Dropdown for selecting which variable this column represents
         self.var_dropdown = dropdown(
             label=tm.translate("Variable"),
             options=self.get_options(),
             value=self.current_name,
             on_change=self.handle_var_switch,
+        )
+
+        # Magnitude selector
+        mag_options = [ft.dropdown.Option("none")] + [
+            ft.dropdown.Option(m) for m in default_units.keys()
+        ]
+        self.mag_dropdown = dropdown(
+            label=tm.translate("Magnitud"),
+            options=mag_options,
+            value=self.pool[self.current_name].get("magnitude", "none"),
+            on_change=self.handle_mag_change,
+        )
+
+        # Unit selector
+        unit_options = self.get_unit_options(self.mag_dropdown.value)
+        self.unit_dropdown = dropdown(
+            label=tm.translate("Unidad"),
+            options=unit_options,
+            value=self.pool[self.current_name].get("unit", "none"),
+            on_change=self.handle_unit_change,
         )
 
         # Container for rows
@@ -87,15 +148,15 @@ class EditableColumn(ft.Container):
                             size=20,
                             color=self.themes.actual_theme["secondary"],
                         ),
-                        ft.Text(
-                            tm.translate("Variable"),
-                            size=12,
-                            weight=ft.FontWeight.W_500,
-                        ),
+                        self.header_display,
                     ],
                     spacing=5,
                 ),
                 self.var_dropdown,
+                ft.Column(
+                    [self.mag_dropdown, self.unit_dropdown],
+                    spacing=5,
+                ),
                 ft.Divider(
                     height=10,
                     thickness=0.5,
@@ -104,12 +165,56 @@ class EditableColumn(ft.Container):
                     ),
                 ),
                 ft.Container(
-                    content=self.rows_col, height=350
-                ),  # Max height for visual sanity
+                    content=self.rows_col, height=250
+                ),  # Reduced height for additional dropdowns
                 ft.Row([self.add_row_btn], alignment=ft.MainAxisAlignment.CENTER),
             ],
             spacing=10,
         )
+
+    def get_latex_header(self):
+        mag = self.pool[self.current_name].get("magnitude", "none")
+        unit = self.pool[self.current_name].get("unit", "none")
+        name = self.current_name
+
+        # Format: Magnitude Name (unit of measure) in latex
+        display_mag = mag if mag != "none" else name
+
+        if unit != "none":
+            return f"$\\text{{{display_mag}}} \\ (\\text{{{unit}}})$"
+        else:
+            return f"$\\text{{{display_mag}}}$"
+
+    def update_header(self):
+        self.header_display.value = self.get_latex_header()
+
+    def get_unit_options(self, mag):
+        if mag == "none" or mag not in default_units:
+            return [ft.dropdown.Option("none")]
+        units = list(default_units[mag].keys())
+        return [ft.dropdown.Option("none")] + [ft.dropdown.Option(u) for u in units]
+
+    def handle_mag_change(self, e):
+        mag = self.mag_dropdown.value
+        self.pool[self.current_name]["magnitude"] = mag
+        self.unit_dropdown.options = self.get_unit_options(mag)
+        self.unit_dropdown.value = "none"
+        self.pool[self.current_name]["unit"] = "none"
+        self.update_header()
+        self.on_change()
+        try:
+            self.update()
+        except RuntimeError:
+            pass
+
+    def handle_unit_change(self, e):
+        self.pool[self.current_name]["unit"] = self.unit_dropdown.value
+        self.update_header()
+        self.on_change()
+        try:
+            self.update()
+        except RuntimeError:
+            pass
 
     def get_options(self):
         return [ft.dropdown.Option(name) for name in self.available_vars_getter()]
@@ -124,11 +229,19 @@ class EditableColumn(ft.Container):
 
     def load_data(self):
         self.rows_col.controls.clear()
-        values = self.pool.get(self.current_name, [])
+        data_entry = self.pool.get(self.current_name, {})
+        values = data_entry.get("values", [])
         for val in values:
             self.rows_col.controls.append(self.create_cell(val))
         if len(values) == 0:
             self.add_row(None)
+
+        # Update unit dropdown state
+        self.mag_dropdown.value = data_entry.get("magnitude", "none")
+        self.unit_dropdown.options = self.get_unit_options(self.mag_dropdown.value)
+        self.unit_dropdown.value = data_entry.get("unit", "none")
+        self.update_header()
+
         try:
             self.update()
         except RuntimeError:
@@ -178,12 +291,21 @@ class EditableColumn(ft.Container):
                     data.append(val)
                 except ValueError:
                     data.append(0.0)
-        self.pool[self.current_name] = data
+
+        current_entry = self.pool.get(self.current_name, {})
+        self.pool[self.current_name] = {
+            "values": data,
+            "magnitude": current_entry.get("magnitude", "none"),
+            "unit": current_entry.get("unit", "none"),
+        }
 
     def get_export_data(self):
+        entry = self.pool.get(self.current_name, {})
         return {
             "name": self.current_name,
-            "values": self.pool.get(self.current_name, []),
+            "values": entry.get("values", []),
+            "magnitude": entry.get("magnitude", "none"),
+            "unit": entry.get("unit", "none"),
         }
 
 
@@ -192,11 +314,17 @@ async def EditorScreen(data: fr.DataSystem, themes):
     raw_data = normalize_editor_data(data.shared.get("editor_data", []))
 
     # We use a central pool (dict) for synchronization
-    # pool: { "V1": [1,2,3], "V2": [...] }
-    pool = {col["name"]: col["values"] for col in raw_data}
+    # pool: { "V1": {"values": [1,2,3], "magnitude": "none", "unit": "none"} }
+    pool = {
+        col["name"]: {
+            "values": col["values"],
+            "magnitude": col["magnitude"],
+            "unit": col["unit"],
+        }
+        for col in raw_data
+    }
 
     # Visual columns track which variable they are currently showing
-    # We'll initialize one UI column for each item in the pool initially
     initial_ui_configs = [col["name"] for col in raw_data]
 
     columns_container = ft.Row(
@@ -209,12 +337,16 @@ async def EditorScreen(data: fr.DataSystem, themes):
         return list(pool.keys())
 
     def update_shared_state():
-        # Export the current state of the pool
-        # Filter: only variables that have names
-        # Note: If multiple UI columns edit the same variable, 'pool' already has the latest sync.
         export_list = []
-        for name, values in pool.items():
-            export_list.append({"name": name, "values": values})
+        for name, entry in pool.items():
+            export_list.append(
+                {
+                    "name": name,
+                    "values": entry["values"],
+                    "magnitude": entry["magnitude"],
+                    "unit": entry["unit"],
+                }
+            )
         data.shared["editor_data"] = export_list
 
     def on_column_data_changed():
@@ -228,7 +360,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
             idx += 1
             new_name = f"V{len(pool) + idx}"
 
-        pool[new_name] = []
+        pool[new_name] = {"values": [], "magnitude": "none", "unit": "none"}
 
         # Add a new UI column bound to this new variable
         new_col = EditableColumn(
@@ -243,7 +375,10 @@ async def EditorScreen(data: fr.DataSystem, themes):
         # Refresh all existing column dropdowns because a new variable is available
         refresh_all_dropdowns()
         update_shared_state()
-        columns_container.update()
+        try:
+            columns_container.update()
+        except RuntimeError:
+            pass
 
     def refresh_all_dropdowns():
         for ctrl in columns_container.controls:
@@ -252,12 +387,15 @@ async def EditorScreen(data: fr.DataSystem, themes):
 
     def clear_all(e=None):
         pool.clear()
-        pool["V1"] = []
+        pool["V1"] = {"values": [], "magnitude": "none", "unit": "none"}
         columns_container.controls.clear()
         # Add one initial column
         add_ui_column()
         update_shared_state()
-        columns_container.update()
+        try:
+            columns_container.update()
+        except RuntimeError:
+            pass
 
     # Build initial UI
     for name in initial_ui_configs:
@@ -313,7 +451,6 @@ async def EditorScreen(data: fr.DataSystem, themes):
                         tm.translate("Editor de Matrices"),
                         size=36,
                         weight=ft.FontWeight.W_800,
-                        # Use a subtle gradient or highlight if possible
                     ),
                     ft.Text(
                         tm.translate("Gestiona y edita tus vectores de datos"),
@@ -339,3 +476,4 @@ async def EditorScreen(data: fr.DataSystem, themes):
             ),
         ],
     )
+
