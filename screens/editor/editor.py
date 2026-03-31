@@ -1,7 +1,9 @@
 import flet as ft
 import flet_base.router as fr
 from flet_base.translations import instance_translation_manager as tm
-from flet_base.components.inputs import dropdown
+from flet_base.components.inputs import dropdown, text_input
+from flet_base.components.modals import modal
+from flet_base.components.buttons import filled_btn
 import flet_base.components.texts as txt
 import importlib.util
 from pathlib import Path
@@ -78,7 +80,9 @@ def normalize_editor_data(raw_data):
 class EditableColumn(ft.Container):
     def __init__(self, pool, current_name, on_change, available_vars_getter, themes):
         super().__init__()
-        self.pool = pool  # Dict of {name: {"values": list, "magnitude": str, "unit": str}}
+        self.pool = (
+            pool  # Dict of {name: {"values": list, "magnitude": str, "unit": str}}
+        )
         self.current_name = current_name
         self.on_change = on_change
         self.available_vars_getter = available_vars_getter
@@ -88,7 +92,7 @@ class EditableColumn(ft.Container):
         self.padding = 15
         self.border_radius = 12
         self.bgcolor = ft.Colors.with_opacity(0.05, themes.actual_theme["on_surface"])
-        self.border = ft.border.all(
+        self.border = ft.Border.all(
             1, ft.Colors.with_opacity(0.1, themes.actual_theme["on_surface"])
         )
 
@@ -139,24 +143,36 @@ class EditableColumn(ft.Container):
             icon_color=self.themes.actual_theme["primary"],
         )
 
+        # Settings button to open modal
+        self.settings_btn = ft.IconButton(
+            icon=ft.Icons.SETTINGS_OUTLINED,
+            on_click=self.open_settings_modal,
+            icon_size=18,
+            tooltip=tm.translate("Configurar magnitud y unidad"),
+            icon_color=self.themes.actual_theme["secondary"],
+        )
+
         self.content = ft.Column(
             [
                 ft.Row(
                     [
-                        ft.Icon(
-                            ft.Icons.TABLE_CHART_OUTLINED,
-                            size=20,
-                            color=self.themes.actual_theme["secondary"],
+                        ft.Row(
+                            [
+                                ft.Icon(
+                                    ft.Icons.TABLE_CHART_OUTLINED,
+                                    size=20,
+                                    color=self.themes.actual_theme["secondary"],
+                                ),
+                                self.header_display,
+                            ],
+                            spacing=5,
+                            expand=True,
                         ),
-                        self.header_display,
+                        self.settings_btn,
                     ],
-                    spacing=5,
+                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                 ),
                 self.var_dropdown,
-                ft.Column(
-                    [self.mag_dropdown, self.unit_dropdown],
-                    spacing=5,
-                ),
                 ft.Divider(
                     height=10,
                     thickness=0.5,
@@ -165,28 +181,64 @@ class EditableColumn(ft.Container):
                     ),
                 ),
                 ft.Container(
-                    content=self.rows_col, height=250
-                ),  # Reduced height for additional dropdowns
+                    content=self.rows_col,
+                    height=320,  # Increased height since dropdowns are gone
+                ),
                 ft.Row([self.add_row_btn], alignment=ft.MainAxisAlignment.CENTER),
             ],
             spacing=10,
         )
+
+    def open_settings_modal(self, e):
+        # We need to reach the page to show the modal
+        page = self.page
+        if not page:
+            return
+
+        settings_dialog = modal(
+            title_str=tm.translate("Configuración de Columna"),
+            content=[
+                ft.Text(
+                    f"{tm.translate('Variable')}: {self.current_name}",
+                    weight=ft.FontWeight.BOLD,
+                ),
+                self.mag_dropdown,
+                self.unit_dropdown,
+            ],
+            actions=[
+                filled_btn(
+                    tm.translate("Cerrar"), on_click=lambda _: page.pop_dialog()
+                ),
+            ],
+        )
+        page.show_dialog(settings_dialog)
 
     def get_latex_header(self):
         mag = self.pool[self.current_name].get("magnitude", "none")
         unit = self.pool[self.current_name].get("unit", "none")
         name = self.current_name
 
-        # Format: Magnitude Name (unit of measure) in latex
         display_mag = mag if mag != "none" else name
 
-        if unit != "none":
-            return f"$\\text{{{display_mag}}} \\ (\\text{{{unit}}})$"
+        # Si el nombre tiene ^ o _, lo tratamos como latex directo
+        if "^" in display_mag or "_" in display_mag:
+            header = f"$${display_mag}"
         else:
-            return f"$\\text{{{display_mag}}}$"
+            header = f"$$\\text{{{display_mag}}}"
+
+        if unit != "none":
+            header += f" \\ (\\text{{{unit}}})$$"
+        else:
+            header += "$$"
+
+        return header
 
     def update_header(self):
         self.header_display.value = self.get_latex_header()
+        try:
+            self.header_display.update()
+        except Exception:
+            pass
 
     def get_unit_options(self, mag):
         if mag == "none" or mag not in default_units:
@@ -233,6 +285,7 @@ class EditableColumn(ft.Container):
         values = data_entry.get("values", [])
         for val in values:
             self.rows_col.controls.append(self.create_cell(val))
+
         if len(values) == 0:
             self.add_row(None)
 
@@ -260,7 +313,7 @@ class EditableColumn(ft.Container):
             ),
             border_radius=6,
             text_size=13,
-            content_padding=ft.padding.symmetric(horizontal=10),
+            content_padding=ft.Padding.symmetric(horizontal=10),
         )
 
     def handle_var_switch(self, e):
@@ -352,29 +405,124 @@ async def EditorScreen(data: fr.DataSystem, themes):
     def on_column_data_changed():
         update_shared_state()
 
-    def add_ui_column(e=None):
-        # Create a new variable in the pool if needed
-        idx = 1
-        new_name = f"V{len(pool) + 1}"
-        while new_name in pool:
-            idx += 1
-            new_name = f"V{len(pool) + idx}"
+    async def open_create_column_modal(e=None):
+        name_field = text_input(
+            placeholder=tm.translate("Nombre variable (ej: x, V1...)")
+        )
 
-        pool[new_name] = {"values": [], "magnitude": "none", "unit": "none"}
+        mag_dropdown = dropdown(
+            label=tm.translate("Magnitud"),
+            options=[ft.dropdown.Option("none")]
+            + [ft.dropdown.Option(m) for m in default_units.keys()],
+            value="none",
+        )
 
-        # Add a new UI column bound to this new variable
+        unit_dropdown = dropdown(
+            label=tm.translate("Unidad"),
+            options=[ft.dropdown.Option("none")],
+            value="none",
+        )
+
+        async def on_mag_change(e):
+            mag = mag_dropdown.value
+            unit_dropdown.options = [ft.dropdown.Option("none")] + [
+                ft.dropdown.Option(u) for u in default_units.get(mag, {}).keys()
+            ]
+            unit_dropdown.value = "none"
+            try:
+                unit_dropdown.update()
+            except RuntimeError:
+                pass
+
+        mag_dropdown.on_change = on_mag_change
+
+        async def save_new_column(e):
+            new_name = name_field.value.strip()
+            if not new_name:
+                return
+            if new_name in pool:
+                return
+
+            pool[new_name] = {
+                "values": [],
+                "magnitude": mag_dropdown.value,
+                "unit": unit_dropdown.value,
+            }
+
+            # Add UI column
+            new_col = EditableColumn(
+                pool=pool,
+                current_name=new_name,
+                on_change=on_column_data_changed,
+                available_vars_getter=get_available_vars,
+                themes=themes,
+            )
+            columns_container.controls.append(new_col)
+
+            refresh_all_dropdowns()
+            update_shared_state()
+            try:
+                columns_container.update()
+            except RuntimeError:
+                pass
+
+            data.page.pop_dialog()
+
+        create_dialog = modal(
+            title_str=tm.translate("Nueva columna de datos"),
+            content=[name_field, mag_dropdown, unit_dropdown],
+            actions=[
+                filled_btn(tm.translate("Crear"), on_click=save_new_column),
+                filled_btn(
+                    tm.translate("Cancelar"),
+                    on_click=lambda _: data.page.pop_dialog(),
+                ),
+            ],
+        )
+
+        data.page.show_dialog(create_dialog)
+
+    # Store in shared for topbar use
+    data.shared["open_create_column_modal"] = open_create_column_modal
+
+    async def add_ui_column(e=None):
+        # We find what variable to show in the new UI column.
+        # It's better to show one that isn't already visible if possible.
+        all_vars = get_available_vars()
+        visible_vars = [
+            ctrl.current_name
+            for ctrl in columns_container.controls
+            if isinstance(ctrl, EditableColumn)
+        ]
+
+        target_var = None
+        for v in all_vars:
+            if v not in visible_vars:
+                target_var = v
+                break
+
+        if not target_var:
+            target_var = all_vars[0] if all_vars else "V1"
+            if target_var not in pool:
+                pool[target_var] = {"values": [], "magnitude": "none", "unit": "none"}
+
         new_col = EditableColumn(
             pool=pool,
-            current_name=new_name,
+            current_name=target_var,
             on_change=on_column_data_changed,
             available_vars_getter=get_available_vars,
             themes=themes,
         )
-        columns_container.controls.append(new_col)
+        # Insert before the "+" button if it exists
+        if (
+            len(columns_container.controls) > 0
+            and isinstance(columns_container.controls[-1], ft.Container)
+            and getattr(columns_container.controls[-1], "data", None) == "add_button"
+        ):
+            columns_container.controls.insert(-1, new_col)
+        else:
+            columns_container.controls.append(new_col)
 
-        # Refresh all existing column dropdowns because a new variable is available
-        refresh_all_dropdowns()
-        update_shared_state()
         try:
             columns_container.update()
         except RuntimeError:
@@ -385,12 +533,10 @@ async def EditorScreen(data: fr.DataSystem, themes):
             if isinstance(ctrl, EditableColumn):
                 ctrl.update_dropdown()
 
-    def clear_all(e=None):
+    async def clear_all(e=None):
         pool.clear()
         pool["V1"] = {"values": [], "magnitude": "none", "unit": "none"}
         columns_container.controls.clear()
-        # Add one initial column
-        add_ui_column()
         update_shared_state()
         try:
             columns_container.update()
@@ -409,6 +555,26 @@ async def EditorScreen(data: fr.DataSystem, themes):
             )
         )
 
+    # ADD BUTTON at the end of columns
+    add_column_card = ft.Container(
+        content=ft.IconButton(
+            icon=ft.Icons.ADD_ROUNDED,
+            icon_size=40,
+            icon_color=themes.actual_theme["primary"],
+            on_click=add_ui_column,
+            tooltip=tm.translate("Añadir columna visual"),
+        ),
+        width=180,
+        height=450,
+        border=ft.Border.all(
+            2, ft.Colors.with_opacity(0.1, themes.actual_theme["on_surface"])
+        ),
+        border_radius=12,
+        alignment=ft.Alignment.CENTER,
+        data="add_button",
+    )
+    columns_container.controls.append(add_column_card)
+
     # Top Buttons Row
     action_buttons = ft.Row(
         [
@@ -419,7 +585,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
             ),
             ft.Row(
                 [
-                    ft.ElevatedButton(
+                    ft.Button(
                         tm.translate("Agregar columna"),
                         icon=ft.Icons.ADD_BOX_OUTLINED,
                         on_click=add_ui_column,
@@ -428,7 +594,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
                             bgcolor={"": themes.actual_theme["primary"]},
                         ),
                     ),
-                    ft.ElevatedButton(
+                    ft.Button(
                         tm.translate("Limpiar todo"),
                         icon=ft.Icons.DELETE_SWEEP_OUTLINED,
                         on_click=clear_all,
@@ -476,4 +642,3 @@ async def EditorScreen(data: fr.DataSystem, themes):
             ),
         ],
     )
-

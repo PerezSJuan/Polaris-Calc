@@ -39,7 +39,11 @@ def create_topbar(page: ft.Page, color_scheme, translation_manager, shared=None)
             file_path = getattr(files[0], "path", None)
             if not file_path:
                 page.snack_bar = ft.SnackBar(
-                    ft.Text(translation_manager.translate("No se pudo leer la ruta del archivo"))
+                    ft.Text(
+                        translation_manager.translate(
+                            "No se pudo leer la ruta del archivo"
+                        )
+                    )
                 )
                 page.snack_bar.open = True
                 page.update()
@@ -49,12 +53,12 @@ def create_topbar(page: ft.Page, color_scheme, translation_manager, shared=None)
                 if shared is not None:
                     shared["editor_data"] = data_loaded
                     shared["current_file_path"] = file_path
-                
+
                 page.snack_bar = ft.SnackBar(
                     ft.Text(f"{translation_manager.translate('Cargado')}: {file_path}")
                 )
                 page.snack_bar.open = True
-                
+
                 if page.route == "/editor":
                     page.go("/home")
                 page.go("/editor")
@@ -86,7 +90,9 @@ def create_topbar(page: ft.Page, color_scheme, translation_manager, shared=None)
             success = save_plc(current_path, current_data)
             if success:
                 page.snack_bar = ft.SnackBar(
-                    ft.Text(f"{translation_manager.translate('Guardado')}: {current_path}")
+                    ft.Text(
+                        f"{translation_manager.translate('Guardado')}: {current_path}"
+                    )
                 )
                 page.snack_bar.open = True
                 page.update()
@@ -124,7 +130,9 @@ def create_topbar(page: ft.Page, color_scheme, translation_manager, shared=None)
                             disabled=page.route != "/editor",
                         ),
                         ft.MenuItemButton(
-                            content=ft.Text(translation_manager.translate("Guardar como")),
+                            content=ft.Text(
+                                translation_manager.translate("Guardar como")
+                            ),
                             on_click=handle_save_as,
                             disabled=page.route != "/editor",
                         ),
@@ -158,6 +166,20 @@ def create_topbar(page: ft.Page, color_scheme, translation_manager, shared=None)
                         ft.MenuItemButton(
                             content=ft.Text(translation_manager.translate("Pegar")),
                             on_click=lambda _: print("Pegar"),
+                        ),
+                    ],
+                ),
+                ft.SubmenuButton(
+                    content=ft.Text(translation_manager.translate("Datos")),
+                    visible=page.route == "/editor",
+                    controls=[
+                        ft.MenuItemButton(
+                            content=ft.Text(
+                                translation_manager.translate("Nueva columna")
+                            ),
+                            on_click=lambda e: shared.get(
+                                "open_create_column_modal", lambda x: None
+                            )(e),
                         ),
                     ],
                 ),
