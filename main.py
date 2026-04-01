@@ -71,10 +71,12 @@ async def Awake(data: fr.DataSystem):
     data.page.title = "Polaris Calc"
     data.page.scroll = ft.ScrollMode.ADAPTIVE
     data.page.fonts = {
-        "Regular":os.path.join(get_assets_dir(), "fonts", "ComicNeue-Regular.ttf"),
+        "Regular": os.path.join(get_assets_dir(), "fonts", "ComicNeue-Regular.ttf"),
         "Bold": os.path.join(get_assets_dir(), "fonts", "ComicNeue-Bold.ttf"),
         "Italic": os.path.join(get_assets_dir(), "fonts", "ComicNeue-Italic.ttf"),
-        "BoldItalic": os.path.join(get_assets_dir(), "fonts", "ComicNeue-BoldItalic.ttf"),
+        "BoldItalic": os.path.join(
+            get_assets_dir(), "fonts", "ComicNeue-BoldItalic.ttf"
+        ),
     }
     data.page.window.icon = os.path.join(get_assets_dir(), "icons", "icon.png")
     data.page.window.resizable = True
@@ -132,16 +134,16 @@ async def TopBar(data: fr.DataSystem, view: ft.View) -> ft.View:
 # _____________ROUTES________________
 @app.page("/home")
 async def Home(data: fr.DataSystem):
+    async def go_to_editor(e):
+        await data.page.push_route("/editor")
+
     return ft.View(
         route="/home",
         controls=[
             txt.body(tm.translate("Acerca de")),
             # Agrega aquí todos los controles de la página
             ft.Text("Contenido de la página principal"),
-            ft.Button(
-                "Ir al Editor", 
-                on_click=lambda _: data.page.go("/editor")
-            ),
+            ft.Button("Ir al Editor", on_click=go_to_editor),
         ],
         vertical_alignment=ft.MainAxisAlignment.START,
         horizontal_alignment=ft.CrossAxisAlignment.CENTER,
