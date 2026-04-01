@@ -1,372 +1,21 @@
 import flet as ft
 import flet_base.router as fr
 from flet_base.translations import instance_translation_manager as tm
-from flet_base.components.inputs import dropdown, text_input
-from flet_base.components.modals import modal
-from flet_base.components.buttons import filled_btn
-import flet_base.components.texts as txt
-import importlib.util
-from pathlib import Path
 
 
-def load_default_units():
-    """Dynamically load default_units from the utils directory."""
-    try:
-        # Expected path: utils/math utils/unit conversor/default_units.py
-        root = Path(__file__).parents[2]
-        units_path = (
-            root / "utils" / "math utils" / "unit conversor" / "default_units.py"
-        )
-
-        if not units_path.exists():
-            return {}
-
-        spec = importlib.util.spec_from_file_location("default_units", str(units_path))
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        return getattr(module, "default_units", {})
-    except Exception as e:
-        print(f"Error loading units: {e}")
-        return {}
-
-
-default_units = load_default_units()
-
-
-def normalize_editor_data(raw_data):
-    """Normalize editor data to [{name: str, values: list, magnitude: str, unit: str}] format."""
-    normalized = []
-
-    if isinstance(raw_data, dict):
-        raw_columns = raw_data.get("columns", [])
-    elif isinstance(raw_data, list):
-        raw_columns = raw_data
-    else:
-        raw_columns = []
-
-    for i, column in enumerate(raw_columns):
-        if isinstance(column, dict):
-            col_name = column.get("name") or column.get("header") or f"V{i + 1}"
-            col_values = column.get("values")
-            if not isinstance(col_values, list):
-                col_values = (
-                    column.get("data") if isinstance(column.get("data"), list) else []
-                )
-            col_mag = column.get("magnitude", "none")
-            col_unit = column.get("unit", "none")
-        elif isinstance(column, list):
-            col_name = f"V{i + 1}"
-            col_values = column
-            col_mag = "none"
-            col_unit = "none"
-        else:
-            continue
-
-        normalized.append(
-            {
-                "name": str(col_name),
-                "values": col_values,
-                "magnitude": col_mag,
-                "unit": col_unit,
-            }
-        )
-
-    if not normalized:
-        normalized = [{"name": "V1", "values": [], "magnitude": "none", "unit": "none"}]
-
-    return normalized
-
-
-class EditableColumn(ft.Container):
-    def __init__(self, pool, current_name, on_change, available_vars_getter, themes):
-        super().__init__()
-        self.pool = (
-            pool  # Dict of {name: {"values": list, "magnitude": str, "unit": str}}
-        )
-        self.current_name = current_name
-        self.on_change = on_change
-        self.available_vars_getter = available_vars_getter
-        self.themes = themes
-
-        self.width = 180
-        self.padding = 15
-        self.border_radius = 12
-        self.bgcolor = ft.Colors.with_opacity(0.05, themes.actual_theme["on_surface"])
-        self.border = ft.Border.all(
-            1, ft.Colors.with_opacity(0.1, themes.actual_theme["on_surface"])
-        )
-
-        self.build_ui()
-
-    def build_ui(self):
-        # Header text (LaTeX style)
-        self.header_display = txt.markdown(self.get_latex_header(), size=14)
-
-        # Dropdown for selecting which variable this column represents
-        self.var_dropdown = dropdown(
-            label=tm.translate("Variable"),
-            options=self.get_options(),
-            value=self.current_name,
-            on_change=self.handle_var_switch,
-        )
-
-        # Magnitude selector
-        mag_options = [ft.dropdown.Option("none")] + [
-            ft.dropdown.Option(m) for m in default_units.keys()
-        ]
-        self.mag_dropdown = dropdown(
-            label=tm.translate("Magnitud"),
-            options=mag_options,
-            value=self.pool[self.current_name].get("magnitude", "none"),
-            on_change=self.handle_mag_change,
-        )
-
-        # Unit selector
-        unit_options = self.get_unit_options(self.mag_dropdown.value)
-        self.unit_dropdown = dropdown(
-            label=tm.translate("Unidad"),
-            options=unit_options,
-            value=self.pool[self.current_name].get("unit", "none"),
-            on_change=self.handle_unit_change,
-        )
-
-        # Container for rows
-        self.rows_col = ft.Column(spacing=8, scroll=ft.ScrollMode.ADAPTIVE)
-        self.load_data()
-
-        # Add row button
-        self.add_row_btn = ft.IconButton(
-            icon=ft.Icons.ADD_CIRCLE_OUTLINE,
-            on_click=self.add_row,
-            icon_size=24,
-            tooltip=tm.translate("Agregar fila"),
-            icon_color=self.themes.actual_theme["primary"],
-        )
-
-        # Settings button to open modal
-        self.settings_btn = ft.IconButton(
-            icon=ft.Icons.SETTINGS_OUTLINED,
-            on_click=self.open_settings_modal,
-            icon_size=18,
-            tooltip=tm.translate("Configurar magnitud y unidad"),
-            icon_color=self.themes.actual_theme["secondary"],
-        )
-
-        self.content = ft.Column(
-            [
-                ft.Row(
-                    [
-                        ft.Row(
-                            [
-                                ft.Icon(
-                                    ft.Icons.TABLE_CHART_OUTLINED,
-                                    size=20,
-                                    color=self.themes.actual_theme["secondary"],
-                                ),
-                                self.header_display,
-                            ],
-                            spacing=5,
-                            expand=True,
-                        ),
-                        self.settings_btn,
-                    ],
-                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                ),
-                self.var_dropdown,
-                ft.Divider(
-                    height=10,
-                    thickness=0.5,
-                    color=ft.Colors.with_opacity(
-                        0.1, self.themes.actual_theme["on_surface"]
-                    ),
-                ),
-                ft.Container(
-                    content=self.rows_col,
-                    height=320,  # Increased height since dropdowns are gone
-                ),
-                ft.Row([self.add_row_btn], alignment=ft.MainAxisAlignment.CENTER),
-            ],
-            spacing=10,
-        )
-
-    def open_settings_modal(self, e):
-        # We need to reach the page to show the modal
-        page = self.page
-        if not page:
-            return
-
-        settings_dialog = modal(
-            title_str=tm.translate("Configuración de Columna"),
-            content=[
-                ft.Text(
-                    f"{tm.translate('Variable')}: {self.current_name}",
-                    weight=ft.FontWeight.BOLD,
-                ),
-                self.mag_dropdown,
-                self.unit_dropdown,
-            ],
-            actions=[
-                filled_btn(
-                    tm.translate("Cerrar"), on_click=lambda _: page.pop_dialog()
-                ),
-            ],
-        )
-        page.show_dialog(settings_dialog)
-
-    def get_latex_header(self):
-        mag = self.pool[self.current_name].get("magnitude", "none")
-        unit = self.pool[self.current_name].get("unit", "none")
-        name = self.current_name
-
-        display_mag = mag if mag != "none" else name
-
-        # Si el nombre tiene ^ o _, lo tratamos como latex directo
-        if "^" in display_mag or "_" in display_mag:
-            header = f"$${display_mag}"
-        else:
-            header = f"$$\\text{{{display_mag}}}"
-
-        if unit != "none":
-            header += f" \\ (\\text{{{unit}}})$$"
-        else:
-            header += "$$"
-
-        return header
-
-    def update_header(self):
-        self.header_display.value = self.get_latex_header()
-        try:
-            self.header_display.update()
-        except Exception:
-            pass
-
-    def get_unit_options(self, mag):
-        if mag == "none" or mag not in default_units:
-            return [ft.dropdown.Option("none")]
-        units = list(default_units[mag].keys())
-        return [ft.dropdown.Option("none")] + [ft.dropdown.Option(u) for u in units]
-
-    def handle_mag_change(self, e):
-        mag = self.mag_dropdown.value
-        self.pool[self.current_name]["magnitude"] = mag
-        self.unit_dropdown.options = self.get_unit_options(mag)
-        self.unit_dropdown.value = "none"
-        self.pool[self.current_name]["unit"] = "none"
-        self.update_header()
-        self.on_change()
-        try:
-            self.update()
-        except RuntimeError:
-            pass
-
-    def handle_unit_change(self, e):
-        self.pool[self.current_name]["unit"] = self.unit_dropdown.value
-        self.update_header()
-        self.on_change()
-        try:
-            self.update()
-        except RuntimeError:
-            pass
-
-    def get_options(self):
-        return [ft.dropdown.Option(name) for name in self.available_vars_getter()]
-
-    def update_dropdown(self):
-        self.var_dropdown.options = self.get_options()
-        self.var_dropdown.value = self.current_name
-        try:
-            self.update()
-        except RuntimeError:
-            pass
-
-    def load_data(self):
-        self.rows_col.controls.clear()
-        data_entry = self.pool.get(self.current_name, {})
-        values = data_entry.get("values", [])
-        for val in values:
-            self.rows_col.controls.append(self.create_cell(val))
-
-        if len(values) == 0:
-            self.add_row(None)
-
-        # Update unit dropdown state
-        self.mag_dropdown.value = data_entry.get("magnitude", "none")
-        self.unit_dropdown.options = self.get_unit_options(self.mag_dropdown.value)
-        self.unit_dropdown.value = data_entry.get("unit", "none")
-        self.update_header()
-
-        try:
-            self.update()
-        except RuntimeError:
-            pass
-
-    def create_cell(self, value):
-        return ft.TextField(
-            value=str(value),
-            dense=True,
-            height=35,
-            text_align=ft.TextAlign.RIGHT,
-            on_change=self.handle_cell_change,
-            border=ft.InputBorder.NONE,
-            bgcolor=ft.Colors.with_opacity(
-                0.05, self.themes.actual_theme["on_surface"]
-            ),
-            border_radius=6,
-            text_size=13,
-            content_padding=ft.Padding.symmetric(horizontal=10),
-        )
-
-    def handle_var_switch(self, e):
-        self.sync_pool()  # Save old one first
-        self.current_name = self.var_dropdown.value
-        self.load_data()
-        self.on_change()
-
-    def handle_cell_change(self, e):
-        self.sync_pool()
-        self.on_change()
-
-    def add_row(self, e):
-        self.rows_col.controls.append(self.create_cell(""))
-        self.sync_pool()
-        self.on_change()
-        try:
-            self.update()
-        except RuntimeError:
-            pass
-
-    def sync_pool(self):
-        data = []
-        for ctrl in self.rows_col.controls:
-            if isinstance(ctrl, ft.TextField):
-                try:
-                    val = float(ctrl.value) if ctrl.value else 0.0
-                    data.append(val)
-                except ValueError:
-                    data.append(0.0)
-
-        current_entry = self.pool.get(self.current_name, {})
-        self.pool[self.current_name] = {
-            "values": data,
-            "magnitude": current_entry.get("magnitude", "none"),
-            "unit": current_entry.get("unit", "none"),
-        }
-
-    def get_export_data(self):
-        entry = self.pool.get(self.current_name, {})
-        return {
-            "name": self.current_name,
-            "values": entry.get("values", []),
-            "magnitude": entry.get("magnitude", "none"),
-            "unit": entry.get("unit", "none"),
-        }
+from screens.editor.utils import normalize_editor_data
+from screens.editor.column import EditableColumn
+from screens.editor.modals import open_create_column_modal
 
 
 async def EditorScreen(data: fr.DataSystem, themes):
+    """
+    Main screen for managing and editing data vectors.
+    """
     # Prepare shared data
     raw_data = normalize_editor_data(data.shared.get("editor_data", []))
 
-    # We use a central pool (dict) for synchronization
+    # Central pool for synchronization
     # pool: { "V1": {"values": [1,2,3], "magnitude": "none", "unit": "none"} }
     pool = {
         col["name"]: {
@@ -377,14 +26,17 @@ async def EditorScreen(data: fr.DataSystem, themes):
         for col in raw_data
     }
 
-    # Visual columns track which variable they are currently showing
+    # Initial states
     initial_ui_configs = [col["name"] for col in raw_data]
 
+    # UI Main Container
     columns_container = ft.Row(
         scroll=ft.ScrollMode.ADAPTIVE,
         vertical_alignment=ft.CrossAxisAlignment.START,
         spacing=20,
     )
+
+    # --- Logic Callbacks ---
 
     def get_available_vars():
         return list(pool.keys())
@@ -405,89 +57,29 @@ async def EditorScreen(data: fr.DataSystem, themes):
     def on_column_data_changed():
         update_shared_state()
 
-    async def open_create_column_modal(e=None):
-        name_field = text_input(
-            placeholder=tm.translate("Nombre variable (ej: x, V1...)")
+    def refresh_all_dropdowns():
+        for ctrl in columns_container.controls:
+            if isinstance(ctrl, EditableColumn):
+                ctrl.update_dropdown()
+
+    async def trigger_create_modal(e=None):
+        await open_create_column_modal(
+            page=data.page,
+            pool=pool,
+            columns_container=columns_container,
+            on_column_data_changed=on_column_data_changed,
+            get_available_vars=get_available_vars,
+            refresh_all_dropdowns=refresh_all_dropdowns,
+            update_shared_state=update_shared_state,
+            themes=themes,
         )
 
-        mag_dropdown = dropdown(
-            label=tm.translate("Magnitud"),
-            options=[ft.dropdown.Option("none")]
-            + [ft.dropdown.Option(m) for m in default_units.keys()],
-            value="none",
-        )
+    # Let other parts of the app (like top-bar) trigger the modal
+    data.shared["open_create_column_modal"] = trigger_create_modal
 
-        unit_dropdown = dropdown(
-            label=tm.translate("Unidad"),
-            options=[ft.dropdown.Option("none")],
-            value="none",
-        )
-
-        async def on_mag_change(e):
-            mag = mag_dropdown.value
-            unit_dropdown.options = [ft.dropdown.Option("none")] + [
-                ft.dropdown.Option(u) for u in default_units.get(mag, {}).keys()
-            ]
-            unit_dropdown.value = "none"
-            try:
-                unit_dropdown.update()
-            except RuntimeError:
-                pass
-
-        mag_dropdown.on_change = on_mag_change
-
-        async def save_new_column(e):
-            new_name = name_field.value.strip()
-            if not new_name:
-                return
-            if new_name in pool:
-                return
-
-            pool[new_name] = {
-                "values": [],
-                "magnitude": mag_dropdown.value,
-                "unit": unit_dropdown.value,
-            }
-
-            # Add UI column
-            new_col = EditableColumn(
-                pool=pool,
-                current_name=new_name,
-                on_change=on_column_data_changed,
-                available_vars_getter=get_available_vars,
-                themes=themes,
-            )
-            columns_container.controls.append(new_col)
-
-            refresh_all_dropdowns()
-            update_shared_state()
-            try:
-                columns_container.update()
-            except RuntimeError:
-                pass
-
-            data.page.pop_dialog()
-
-        create_dialog = modal(
-            title_str=tm.translate("Nueva columna de datos"),
-            content=[name_field, mag_dropdown, unit_dropdown],
-            actions=[
-                filled_btn(tm.translate("Crear"), on_click=save_new_column),
-                filled_btn(
-                    tm.translate("Cancelar"),
-                    on_click=lambda _: data.page.pop_dialog(),
-                ),
-            ],
-        )
-
-        data.page.show_dialog(create_dialog)
-
-    # Store in shared for topbar use
-    data.shared["open_create_column_modal"] = open_create_column_modal
+    # --- UI Actions ---
 
     async def add_ui_column(e=None):
-        # We find what variable to show in the new UI column.
-        # It's better to show one that isn't already visible if possible.
         all_vars = get_available_vars()
         visible_vars = [
             ctrl.current_name
@@ -495,11 +87,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
             if isinstance(ctrl, EditableColumn)
         ]
 
-        target_var = None
-        for v in all_vars:
-            if v not in visible_vars:
-                target_var = v
-                break
+        target_var = next((v for v in all_vars if v not in visible_vars), None)
 
         if not target_var:
             target_var = all_vars[0] if all_vars else "V1"
@@ -513,10 +101,10 @@ async def EditorScreen(data: fr.DataSystem, themes):
             available_vars_getter=get_available_vars,
             themes=themes,
         )
-        # Insert before the "+" button if it exists
+
+        # Place before the "+" buttoncard
         if (
             len(columns_container.controls) > 0
-            and isinstance(columns_container.controls[-1], ft.Container)
             and getattr(columns_container.controls[-1], "data", None) == "add_button"
         ):
             columns_container.controls.insert(-1, new_col)
@@ -528,22 +116,23 @@ async def EditorScreen(data: fr.DataSystem, themes):
         except RuntimeError:
             pass
 
-    def refresh_all_dropdowns():
-        for ctrl in columns_container.controls:
-            if isinstance(ctrl, EditableColumn):
-                ctrl.update_dropdown()
-
     async def clear_all(e=None):
         pool.clear()
         pool["V1"] = {"values": [], "magnitude": "none", "unit": "none"}
         columns_container.controls.clear()
+        # Re-add V1 visually
+        # (This avoids leaving the screen completely empty)
+        await add_ui_column()
+        # Add the "+" button card back if it was cleared
+        columns_container.controls.append(add_column_card)
         update_shared_state()
         try:
             columns_container.update()
         except RuntimeError:
             pass
 
-    # Build initial UI
+    # --- Initial UI Construction ---
+
     for name in initial_ui_configs:
         columns_container.controls.append(
             EditableColumn(
@@ -555,7 +144,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
             )
         )
 
-    # ADD BUTTON at the end of columns
+    # "+" card for adding more visual columns
     add_column_card = ft.Container(
         content=ft.IconButton(
             icon=ft.Icons.ADD_ROUNDED,
