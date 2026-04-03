@@ -55,12 +55,32 @@ async def EditorScreen(data: fr.DataSystem, themes):
         data.shared["editor_data"] = export_list
 
     def on_column_data_changed():
+        # Update the shared state dictionary and then synchronize all column UI.
+        # ``refresh_all_columns`` now uses ``sync_with_pool`` which updates the
+        # existing TextField controls in place, preserving the user's focus.
         update_shared_state()
+        refresh_all_columns()
+        # Reset the just_changed flag on all columns after the refresh.
+        for ctrl in columns_container.controls:
+            if isinstance(ctrl, EditableColumn):
+                ctrl._just_changed = False
 
     def refresh_all_dropdowns():
         for ctrl in columns_container.controls:
             if isinstance(ctrl, EditableColumn):
                 ctrl.update_dropdown()
+
+    def refresh_all_columns():
+        """Synchronize all ``EditableColumn`` instances with the current ``pool``.
+
+        ``sync_with_pool`` updates the existing ``TextField`` controls in place
+        without recreating the widget hierarchy, which preserves the user's
+        cursor position. We now apply it to every column; the method itself avoids
+        actions that would steal focus.
+        """
+        for ctrl in columns_container.controls:
+            if isinstance(ctrl, EditableColumn):
+                ctrl.sync_with_pool()
 
     async def trigger_create_modal(e=None):
         await open_create_column_modal(
@@ -80,7 +100,16 @@ async def EditorScreen(data: fr.DataSystem, themes):
     # --- UI Actions ---
 
     async def add_ui_column(e=None):
+        """Add a new visual column for a variable that is not yet displayed.
+
+        The function determines which variables are already represented, picks
+        the first unused variable (or creates a new one), and inserts a new
+        ``EditableColumn`` before the ``+`` button card. The container update is
+        performed after insertion; individual column widgets handle their own
+        UI updates, preserving any active text field focus.
+        """
         all_vars = get_available_vars()
+        # Variables currently shown in visible columns.
         visible_vars = [
             ctrl.current_name
             for ctrl in columns_container.controls
@@ -102,7 +131,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
             themes=themes,
         )
 
-        # Place before the "+" buttoncard
+        # Insert before the "+" button card.
         if (
             len(columns_container.controls) > 0
             and getattr(columns_container.controls[-1], "data", None) == "add_button"
@@ -111,6 +140,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
         else:
             columns_container.controls.append(new_col)
 
+        # Update the container layout.
         try:
             columns_container.update()
         except RuntimeError:

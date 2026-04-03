@@ -26,6 +26,11 @@ class EditableColumn(ft.Container):
             1, ft.Colors.with_opacity(0.1, themes.actual_theme["on_surface"])
         )
 
+        # Internal flag used to indicate that this column initiated a change.
+        # The editor will skip synchronizing this column during the global
+        # refresh to avoid overwriting the active TextField and losing focus.
+        self._just_changed = False
+
         self.build_ui()
 
     def build_ui(self):
@@ -183,19 +188,16 @@ class EditableColumn(ft.Container):
         self.pool[self.current_name]["unit"] = "none"
         self.update_header()
         self.on_change()
-        try:
-            self.update()
-        except RuntimeError:
-            pass
+        self._just_changed = True
+        # Do not call ``self.update()`` here to avoid a full widget redraw that
+        # would cause the active TextField to lose focus. Individual control
+        # updates are performed above.
 
     def handle_unit_change(self, e):
         self.pool[self.current_name]["unit"] = self.unit_dropdown.value
         self.update_header()
         self.on_change()
-        try:
-            self.update()
-        except RuntimeError:
-            pass
+        self._just_changed = True
 
     def get_options(self):
         return [ft.dropdown.Option(name) for name in self.available_vars_getter()]
@@ -203,10 +205,6 @@ class EditableColumn(ft.Container):
     def update_dropdown(self):
         self.var_dropdown.options = self.get_options()
         self.var_dropdown.value = self.current_name
-        try:
-            self.update()
-        except RuntimeError:
-            pass
 
     def load_data(self):
         self.rows_col.controls.clear()
@@ -224,10 +222,6 @@ class EditableColumn(ft.Container):
         self.unit_dropdown.value = data_entry.get("unit", "none")
         self.update_header()
 
-        try:
-            self.update()
-        except RuntimeError:
-            pass
 
     def create_cell(self, value):
         return ft.TextField(
@@ -249,20 +243,21 @@ class EditableColumn(ft.Container):
         self.sync_pool()  # Save old one first
         self.current_name = self.var_dropdown.value
         self.load_data()
+        # Mark this column as the source of the change to avoid self.update()
+        self._just_changed = True
         self.on_change()
 
     def handle_cell_change(self, e):
         self.sync_pool()
+        # Mark this column as the source of the change.
+        self._just_changed = True
         self.on_change()
 
     def add_row(self, e):
         self.rows_col.controls.append(self.create_cell(""))
         self.sync_pool()
+        self._just_changed = True
         self.on_change()
-        try:
-            self.update()
-        except RuntimeError:
-            pass
 
     def sync_pool(self):
         data = []
@@ -280,6 +275,69 @@ class EditableColumn(ft.Container):
             "magnitude": current_entry.get("magnitude", "none"),
             "unit": current_entry.get("unit", "none"),
         }
+
+    def sync_with_pool(self):
+        """Update the UI rows to reflect the current values in ``self.pool``.
+
+        This method updates existing ``TextField`` controls in place, adding or
+        removing rows as necessary, without recreating the entire column UI.
+        It is used to keep multiple columns that reference the same variable
+        in sync while preserving the user's focus on any active text field.
+        """
+        entry = self.pool.get(self.current_name, {})
+        values = entry.get("values", [])
+        # Adjust number of rows to match the values list
+        current_len = len(self.rows_col.controls)
+        target_len = len(values)
+        # Add missing rows
+        for _ in range(target_len - current_len):
+            self.rows_col.controls.append(self.create_cell(""))
+        # Remove extra rows
+        if target_len < current_len:
+            del self.rows_col.controls[target_len:]
+        # If there are no values, ensure at least one empty row (mirrors load_data behavior)
+        if target_len == 0:
+            self.rows_col.controls.append(self.create_cell(""))
+        # Update values in existing rows
+        for ctrl, val in zip(self.rows_col.controls, values):
+            if isinstance(ctrl, ft.TextField):
+                # If this TextField currently has focus, skip updating its value
+                # to avoid resetting the cursor position.
+                if getattr(ctrl, "focused", False):
+                    continue
+                new_val = str(val)
+                if ctrl.value != new_val:
+                    ctrl.value = new_val
+        # Ensure header and dropdowns reflect any magnitude/unit changes
+        self.mag_dropdown.value = entry.get("magnitude", "none")
+        self.unit_dropdown.options = self.get_unit_options(self.mag_dropdown.value)
+        self.unit_dropdown.value = entry.get("unit", "none")
+        self.update_header()
+        # Update the rows container once to reflect new values without
+        # triggering a full widget redraw that could steal focus.
+        try:
+            self.rows_col.update()
+        except Exception:
+            pass
+        # Refresh the container so that any changes to the rows become visible.
+        # Only refresh the container if this column did not originate the change.
+        # ``self._just_changed`` is set by the event handlers before calling
+        # ``on_change``. Skipping the container update prevents the active
+        # TextField from losing focus while still updating the rows layout.
+        if not getattr(self, "_just_changed", False):
+            try:
+                self.update()
+            except RuntimeError:
+                pass
+        # Reset the flag after synchronization so future changes are handled normally.
+        self._just_changed = False
+        # Refresh the column container so that header and dropdown changes are
+        # applied. This does not recreate the TextField widgets (their values are
+        # only changed when necessary), so the current cursor position remains
+        # intact.
+        # Update the column container itself so that any header or dropdown
+        # changes become visible. This does not recreate the TextField widgets,
+        # so the current cursor position remains intact.
 
     def get_export_data(self):
         entry = self.pool.get(self.current_name, {})
