@@ -2,21 +2,15 @@ import flet as ft
 import flet_base.router as fr
 from flet_base.translations import instance_translation_manager as tm
 
-
 from screens.editor.utils import normalize_editor_data
 from screens.editor.column import EditableColumn
 from screens.editor.modals import open_create_column_modal
 
 
 async def EditorScreen(data: fr.DataSystem, themes):
-    """
-    Main screen for managing and editing data vectors.
-    """
-    # Prepare shared data
-    raw_data = normalize_editor_data(data.shared.get("editor_data", []))
+    """Main screen for managing and editing data vectors."""
 
-    # Central pool for synchronization
-    # pool: { "V1": {"values": [1,2,3], "magnitude": "none", "unit": "none"} }
+    raw_data = normalize_editor_data(data.shared.get("editor_data", []))
     pool = {
         col["name"]: {
             "values": col["values"],
@@ -26,67 +20,93 @@ async def EditorScreen(data: fr.DataSystem, themes):
         for col in raw_data
     }
 
-    # Initial states
-    initial_ui_configs = [col["name"] for col in raw_data]
-
-    # UI Main Container
-    columns_container = ft.Row(
+    columns_row = ft.Row(
         scroll=ft.ScrollMode.ADAPTIVE,
         vertical_alignment=ft.CrossAxisAlignment.START,
         spacing=20,
     )
 
-    # --- Logic Callbacks ---
+    # ------------------------------------------------------------------ #
+    #  Helpers                                                             #
+    # ------------------------------------------------------------------ #
 
     def get_available_vars():
         return list(pool.keys())
 
+    def _visible_columns():
+        return [c for c in columns_row.controls if isinstance(c, EditableColumn)]
+
+    def _try_update(widget):
+        try:
+            widget.update()
+        except RuntimeError:
+            pass
+
+    # ------------------------------------------------------------------ #
+    #  Pool / state sync                                                   #
+    # ------------------------------------------------------------------ #
+
     def update_shared_state():
-        export_list = []
-        for name, entry in pool.items():
-            export_list.append(
-                {
-                    "name": name,
-                    "values": entry["values"],
-                    "magnitude": entry["magnitude"],
-                    "unit": entry["unit"],
-                }
-            )
-        data.shared["editor_data"] = export_list
+        data.shared["editor_data"] = [
+            {"name": name, **entry} for name, entry in pool.items()
+        ]
 
     def on_column_data_changed():
-        # Update the shared state dictionary and then synchronize all column UI.
-        # ``refresh_all_columns`` now uses ``sync_with_pool`` which updates the
-        # existing TextField controls in place, preserving the user's focus.
         update_shared_state()
-        refresh_all_columns()
-        # Reset the just_changed flag on all columns after the refresh.
-        for ctrl in columns_container.controls:
-            if isinstance(ctrl, EditableColumn):
-                ctrl._just_changed = False
+        for col in _visible_columns():
+            col.sync_with_pool()
+            col._just_changed = False
 
     def refresh_all_dropdowns():
-        for ctrl in columns_container.controls:
-            if isinstance(ctrl, EditableColumn):
-                ctrl.update_dropdown()
+        for col in _visible_columns():
+            col.update_dropdown()
 
-    def refresh_all_columns():
-        """Synchronize all ``EditableColumn`` instances with the current ``pool``.
+    # ------------------------------------------------------------------ #
+    #  Column management                                                   #
+    # ------------------------------------------------------------------ #
 
-        ``sync_with_pool`` updates the existing ``TextField`` controls in place
-        without recreating the widget hierarchy, which preserves the user's
-        cursor position. We now apply it to every column; the method itself avoids
-        actions that would steal focus.
-        """
-        for ctrl in columns_container.controls:
-            if isinstance(ctrl, EditableColumn):
-                ctrl.sync_with_pool()
+    def _make_column(name):
+        return EditableColumn(
+            pool=pool,
+            current_name=name,
+            on_change=on_column_data_changed,
+            available_vars_getter=get_available_vars,
+            themes=themes,
+        )
+
+    def _insert_column(col):
+        """Insert before the '+' card (always the last control)."""
+        controls = columns_row.controls
+        if controls and getattr(controls[-1], "data", None) == "add_button":
+            controls.insert(-1, col)
+        else:
+            controls.append(col)
+
+    async def add_ui_column(e=None):
+        visible_names = {col.current_name for col in _visible_columns()}
+        target = next((v for v in get_available_vars() if v not in visible_names), None)
+
+        if target is None:
+            target = get_available_vars()[0] if pool else "V1"
+            pool.setdefault(target, {"values": [], "magnitude": "none", "unit": "none"})
+
+        _insert_column(_make_column(target))
+        _try_update(columns_row)
+
+    async def clear_all(e=None):
+        pool.clear()
+        pool["V1"] = {"values": [], "magnitude": "none", "unit": "none"}
+        columns_row.controls.clear()
+        columns_row.controls.append(add_column_card)
+        await add_ui_column()
+        update_shared_state()
+        _try_update(columns_row)
 
     async def trigger_create_modal(e=None):
         await open_create_column_modal(
             page=data.page,
             pool=pool,
-            columns_container=columns_container,
+            columns_row=columns_row,
             on_column_data_changed=on_column_data_changed,
             get_available_vars=get_available_vars,
             refresh_all_dropdowns=refresh_all_dropdowns,
@@ -94,87 +114,15 @@ async def EditorScreen(data: fr.DataSystem, themes):
             themes=themes,
         )
 
-    # Let other parts of the app (like top-bar) trigger the modal
     data.shared["open_create_column_modal"] = trigger_create_modal
 
-    # --- UI Actions ---
+    # ------------------------------------------------------------------ #
+    #  Initial UI                                                          #
+    # ------------------------------------------------------------------ #
 
-    async def add_ui_column(e=None):
-        """Add a new visual column for a variable that is not yet displayed.
+    for name in (col["name"] for col in raw_data):
+        columns_row.controls.append(_make_column(name))
 
-        The function determines which variables are already represented, picks
-        the first unused variable (or creates a new one), and inserts a new
-        ``EditableColumn`` before the ``+`` button card. The container update is
-        performed after insertion; individual column widgets handle their own
-        UI updates, preserving any active text field focus.
-        """
-        all_vars = get_available_vars()
-        # Variables currently shown in visible columns.
-        visible_vars = [
-            ctrl.current_name
-            for ctrl in columns_container.controls
-            if isinstance(ctrl, EditableColumn)
-        ]
-
-        target_var = next((v for v in all_vars if v not in visible_vars), None)
-
-        if not target_var:
-            target_var = all_vars[0] if all_vars else "V1"
-            if target_var not in pool:
-                pool[target_var] = {"values": [], "magnitude": "none", "unit": "none"}
-
-        new_col = EditableColumn(
-            pool=pool,
-            current_name=target_var,
-            on_change=on_column_data_changed,
-            available_vars_getter=get_available_vars,
-            themes=themes,
-        )
-
-        # Insert before the "+" button card.
-        if (
-            len(columns_container.controls) > 0
-            and getattr(columns_container.controls[-1], "data", None) == "add_button"
-        ):
-            columns_container.controls.insert(-1, new_col)
-        else:
-            columns_container.controls.append(new_col)
-
-        # Update the container layout.
-        try:
-            columns_container.update()
-        except RuntimeError:
-            pass
-
-    async def clear_all(e=None):
-        pool.clear()
-        pool["V1"] = {"values": [], "magnitude": "none", "unit": "none"}
-        columns_container.controls.clear()
-        # Re-add V1 visually
-        # (This avoids leaving the screen completely empty)
-        await add_ui_column()
-        # Add the "+" button card back if it was cleared
-        columns_container.controls.append(add_column_card)
-        update_shared_state()
-        try:
-            columns_container.update()
-        except RuntimeError:
-            pass
-
-    # --- Initial UI Construction ---
-
-    for name in initial_ui_configs:
-        columns_container.controls.append(
-            EditableColumn(
-                pool=pool,
-                current_name=name,
-                on_change=on_column_data_changed,
-                available_vars_getter=get_available_vars,
-                themes=themes,
-            )
-        )
-
-    # "+" card for adding more visual columns
     add_column_card = ft.Container(
         content=ft.IconButton(
             icon=ft.Icons.ADD_ROUNDED,
@@ -192,9 +140,8 @@ async def EditorScreen(data: fr.DataSystem, themes):
         alignment=ft.Alignment.CENTER,
         data="add_button",
     )
-    columns_container.controls.append(add_column_card)
+    columns_row.controls.append(add_column_card)
 
-    # Top Buttons Row
     action_buttons = ft.Row(
         [
             ft.TextButton(
@@ -205,9 +152,9 @@ async def EditorScreen(data: fr.DataSystem, themes):
             ft.Row(
                 [
                     ft.Button(
-                        tm.translate("Agregar columna"),
+                        tm.translate("Agregar variable"),
                         icon=ft.Icons.ADD_BOX_OUTLINED,
-                        on_click=add_ui_column,
+                        on_click=trigger_create_modal,
                         style=ft.ButtonStyle(
                             color={"": themes.actual_theme["on_primary"]},
                             bgcolor={"": themes.actual_theme["primary"]},
@@ -251,7 +198,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
             action_buttons,
             ft.Container(height=20),
             ft.Container(
-                content=columns_container,
+                content=columns_row,
                 expand=True,
                 padding=10,
                 border_radius=15,
