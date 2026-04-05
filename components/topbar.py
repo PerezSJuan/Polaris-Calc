@@ -99,6 +99,14 @@ def create_topbar(page: ft.Page, color_scheme, translation_manager, shared=None)
         else:
             await handle_save_as(e)
 
+    async def handle_go_home(e):
+        await page.push_route("/home")
+
+    async def handle_trigger_create_modal(e):
+        trigger = shared.get("open_create_column_modal") if shared is not None else None
+        if trigger:
+            await trigger(e)
+
     return ft.Container(
         bgcolor=bg_color,
         height=35,
@@ -137,6 +145,12 @@ def create_topbar(page: ft.Page, color_scheme, translation_manager, shared=None)
                             disabled=page.route != "/editor",
                         ),
                         ft.Divider(),
+                        ft.MenuItemButton(
+                            content=ft.Text(
+                                translation_manager.translate("Ir al menú principal")
+                            ),
+                            on_click=handle_go_home,
+                        ),
                         ft.MenuItemButton(
                             content=ft.Text(translation_manager.translate("Salir")),
                             on_click=lambda _: page.window.close(),
@@ -177,9 +191,8 @@ def create_topbar(page: ft.Page, color_scheme, translation_manager, shared=None)
                             content=ft.Text(
                                 translation_manager.translate("Nueva columna")
                             ),
-                            on_click=lambda e: shared.get(
-                                "open_create_column_modal", lambda x: None
-                            )(e),
+                            disabled=page.route != "/editor",
+                            on_click=handle_trigger_create_modal,
                         ),
                     ],
                 ),

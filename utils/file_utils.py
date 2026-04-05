@@ -3,9 +3,7 @@ import os
 
 
 def _normalize_columns(raw_data):
-    """Return columns in canonical format: [{name: str, values: list}]."""
-    columns = []
-
+    """Return columns in canonical format: [{name, values, magnitude, unit}]."""
     if isinstance(raw_data, dict):
         raw_columns = raw_data.get("columns", [])
     elif isinstance(raw_data, list):
@@ -13,41 +11,61 @@ def _normalize_columns(raw_data):
     else:
         raw_columns = []
 
+    columns = []
     for i, col in enumerate(raw_columns):
         if isinstance(col, dict):
             name = col.get("name") or col.get("header") or f"V{i + 1}"
             values = col.get("values")
             if not isinstance(values, list):
                 values = col.get("data") if isinstance(col.get("data"), list) else []
+            magnitude = col.get("magnitude", "none")
+            unit = col.get("unit", "none")
         elif isinstance(col, list):
-            name = f"V{i + 1}"
-            values = col
+            name, values, magnitude, unit = f"V{i + 1}", col, "none", "none"
         else:
             continue
 
-        columns.append({"name": str(name), "values": values})
+        columns.append({
+            "name": str(name),
+            "values": values,
+            "magnitude": magnitude,
+            "unit": unit,
+        })
 
-    if not columns:
-        columns = [{"name": "V1", "values": []}]
+    return columns or [{"name": "V1", "values": [], "magnitude": "none", "unit": "none"}]
 
-    return columns
+
+def _normalize_layout(layout, columns_data):
+    """Ensure layout has a valid tabs list."""
+    if not isinstance(layout, dict):
+        layout = {}
+
+    tabs = layout.get("tabs")
+    if not isinstance(tabs, list) or not tabs:
+        all_cols = [c["name"] for c in columns_data]
+        tabs = [{"name": "General", "columns": all_cols}]
+
+    return {
+        "tabs": tabs,
+        "active_tab_index": layout.get("active_tab_index", 0),
+    }
 
 
 def save_plc(file_path, data):
-    """
-    Saves matrix columns to a .plc file.
-    The canonical format stores column names and values.
-    """
+    """Save columns and layout to a .plc file."""
     if not file_path.endswith(".plc"):
         file_path += ".plc"
-
     try:
-        payload = {
-            "version": 1,
-            "columns": _normalize_columns(data),
-        }
+        if isinstance(data, dict):
+            columns = _normalize_columns(data.get("columns", []))
+            layout = _normalize_layout(data.get("layout"), columns)
+        else:
+            columns = _normalize_columns(data)
+            layout = _normalize_layout(None, columns)
+
         with open(file_path, "w", encoding="utf-8") as f:
-            json.dump(payload, f, indent=4)
+            json.dump({"version": 2, "columns": columns, "layout": layout}, f, indent=4)
+
         print(f"File saved successfully: {file_path}")
         return True
     except Exception as e:
@@ -56,34 +74,30 @@ def save_plc(file_path, data):
 
 
 def load_plc(file_path):
-    """
-    Loads data from a .plc file and returns canonical columns.
-    """
+    """Load a .plc file and return {columns, layout}."""
     if not os.path.exists(file_path):
         print(f"File not found: {file_path}")
         return None
-
     try:
         with open(file_path, "r", encoding="utf-8") as f:
             data = json.load(f)
+
+        columns = _normalize_columns(data)
+        layout = _normalize_layout(
+            data.get("layout") if isinstance(data, dict) else None,
+            columns,
+        )
+
         print(f"File loaded successfully: {file_path}")
-        return _normalize_columns(data)
+        return {"columns": columns, "layout": layout}
     except Exception as e:
         print(f"Error loading file: {e}")
         return None
 
 
 def open_plc_dialog(page):
-    """
-    Example of how to trigger an open dialog in Flet (placeholder functionality).
-    In a real app, this would use page.file_picker.pick_files().
-    """
     pass
 
 
 def save_plc_dialog(page):
-    """
-    Example of how to trigger a save dialog in Flet (placeholder functionality).
-    In a real app, this would use page.file_picker.save_file().
-    """
     pass
