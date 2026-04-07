@@ -191,6 +191,17 @@ async def EditorScreen(data: fr.DataSystem, themes):
                             ),
                         ),
                         ft.IconButton(
+                            icon=ft.Icons.EDIT_OUTLINED,
+                            icon_size=12,
+                            icon_color=ft.Colors.with_opacity(
+                                0.5, themes.actual_theme["on_surface"]
+                            ),
+                            on_click=lambda e, idx=i: _rename_tab(idx),
+                            tooltip=tm.translate("Renombrar pestaña"),
+                            width=24,
+                            height=24,
+                        ),
+                        ft.IconButton(
                             icon=ft.Icons.CLOSE,
                             icon_size=12,
                             icon_color=ft.Colors.with_opacity(
@@ -227,7 +238,20 @@ async def EditorScreen(data: fr.DataSystem, themes):
                 on_click=lambda e, idx=i: _switch_tab(idx),
                 data=f"tab_{i}",
             )
-            tabs_row.controls.append(tab_btn)
+
+            draggable = ft.Draggable(
+                group="tabs",
+                content=tab_btn,
+                data=i,
+            )
+
+            drag_target = ft.DragTarget(
+                group="tabs",
+                content=draggable,
+                on_accept=lambda e, idx=i: _move_tab(e, idx),
+            )
+
+            tabs_row.controls.append(drag_target)
 
         # "+" button to add a new tab
         tabs_row.controls.append(
@@ -266,6 +290,55 @@ async def EditorScreen(data: fr.DataSystem, themes):
         _rebuild_columns_row()
         update_shared_state()
 
+    def _rename_tab(idx: int):
+        def _close_dlg(e):
+            rename_dlg.open = False
+            data.page.update()
+
+        def _save_name(e):
+            new_name = rename_field.value.strip()
+            if new_name:
+                tabs[idx]["name"] = new_name
+                _build_tab_bar()
+                update_shared_state()
+            _close_dlg(e)
+
+        rename_field = ft.TextField(
+            value=tabs[idx]["name"], autofocus=True, on_submit=_save_name
+        )
+        rename_dlg = ft.AlertDialog(
+            title=ft.Text(tm.translate("Renombrar pestaña")),
+            content=rename_field,
+            actions=[
+                ft.TextButton(tm.translate("Cancelar"), on_click=_close_dlg),
+                ft.TextButton(tm.translate("Guardar"), on_click=_save_name),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+        data.page.overlay.append(rename_dlg)
+        rename_dlg.open = True
+        data.page.update()
+
+    def _move_tab(e, target_idx: int):
+        src_ctrl = data.page.get_control(e.src_id)
+        if not src_ctrl:
+            return
+        src_idx = src_ctrl.data
+        if type(src_idx) is not int:
+            return
+        if src_idx == target_idx:
+            return
+
+        active_id = tabs[active_index[0]]["id"]
+
+        moved_tab = tabs.pop(src_idx)
+        tabs.insert(target_idx, moved_tab)
+
+        active_index[0] = next(i for i, t in enumerate(tabs) if t["id"] == active_id)
+
+        _build_tab_bar()
+        update_shared_state()
+
     # ------------------------------------------------------------------
     # "+" column card  (defined here so _rebuild_columns_row can use it)
     # ------------------------------------------------------------------
@@ -293,46 +366,10 @@ async def EditorScreen(data: fr.DataSystem, themes):
     _build_tab_bar()
     _rebuild_columns_row()
 
-    # ------------------------------------------------------------------
-    # Action buttons
-    # ------------------------------------------------------------------
-    action_buttons = ft.Row(
-        [
-            ft.TextButton(
-                tm.translate("Atrás"),
-                icon=ft.Icons.CHEVRON_LEFT,
-                on_click=lambda _: data.page.go("/home"),
-            ),
-            ft.Row(
-                [
-                    ft.Button(
-                        tm.translate("Agregar variable"),
-                        icon=ft.Icons.ADD_BOX_OUTLINED,
-                        on_click=trigger_create_modal,
-                        style=ft.ButtonStyle(
-                            color={"": themes.actual_theme["on_primary"]},
-                            bgcolor={"": themes.actual_theme["primary"]},
-                        ),
-                    ),
-                    ft.Button(
-                        tm.translate("Limpiar todo"),
-                        icon=ft.Icons.DELETE_SWEEP_OUTLINED,
-                        on_click=clear_all,
-                        color=ft.Colors.ERROR,
-                    ),
-                ],
-                spacing=10,
-            ),
-        ],
-        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-    )
-
     return ft.View(
         route="/editor",
         padding=30,
         controls=[
-            action_buttons,
-            ft.Container(height=12),
             # Tab bar
             ft.Container(
                 content=tabs_row,
