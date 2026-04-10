@@ -43,8 +43,8 @@ class EditableColumn(ft.Container):
             on_change=self._on_var_switch,
         )
 
-        mag_options = [ft.dropdown.Option("none")] + [
-            ft.dropdown.Option(m) for m in default_units
+        mag_options = [ft.DropdownOption("none")] + [
+            ft.DropdownOption(m) for m in default_units
         ]
         self.mag_dropdown = dropdown(
             label=tm.translate("Magnitud"),
@@ -132,13 +132,13 @@ class EditableColumn(ft.Container):
         return header
 
     def _get_unit_options(self, mag):
-        base = [ft.dropdown.Option("none")]
+        base = [ft.DropdownOption("none")]
         if mag == "none" or mag not in default_units:
             return base
-        return base + [ft.dropdown.Option(u) for u in default_units[mag]]
+        return base + [ft.DropdownOption(u) for u in default_units[mag]]
 
     def _get_var_options(self):
-        return [ft.dropdown.Option(name) for name in self.available_vars_getter()]
+        return [ft.DropdownOption(name) for name in self.available_vars_getter()]
 
     def _make_cell(self, value=""):
         return ft.TextField(

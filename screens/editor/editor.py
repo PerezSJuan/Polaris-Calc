@@ -7,6 +7,8 @@ from screens.editor.utils import normalize_editor_data
 from screens.editor.column import EditableColumn
 from screens.editor.modals import open_create_column_modal
 
+from screens.editor.modals import open_settings_modal as _open_settings_modal
+
 
 async def EditorScreen(data: fr.DataSystem, themes):
     """Main screen for managing and editing data vectors, with tab layout."""
@@ -26,19 +28,30 @@ async def EditorScreen(data: fr.DataSystem, themes):
     }
 
     # ------------------------------------------------------------------
-    # Tab state  [{id, name, columns: [var_name, ...]}]
+    # Tab state  [{id, name, columns: [var_name, ...], fixed: bool}]
     # ------------------------------------------------------------------
     raw_tabs = normalized["layout"]["tabs"]
-    tabs: list[dict] = [
+
+    summary_tab = {
+        "id": "fixed_summary",
+        "name": tm.translate("Resumen"),
+        "columns": [],
+        "fixed": True
+    }
+
+    tabs: list[dict] = [summary_tab] + [
         {
             "id": str(uuid.uuid4()),
             "name": t["name"],
             "columns": list(t.get("columns", [])),
+            "fixed": False
         }
-        for t in raw_tabs
+        for t in raw_tabs if t.get("id") != "fixed_summary"
     ]
+    # Shift active index to account for summary tab at 0
+    saved_active = normalized["layout"].get("active_tab_index", 0)
     active_index: list[int] = [
-        max(0, min(normalized["layout"]["active_tab_index"], len(tabs) - 1))
+        min(saved_active + 1, len(tabs) - 1) if saved_active >= 0 else 0
     ]  # mutable via list so closures can write to it
 
     # ------------------------------------------------------------------
@@ -68,6 +81,83 @@ async def EditorScreen(data: fr.DataSystem, themes):
 
     def _current_tab() -> dict:
         return tabs[active_index[0]]
+
+    def _build_summary_view():
+        cards = []
+        for i, (name, entry) in enumerate(pool.items()):
+            values = entry.get("values", [])
+            count = len(values)
+            magnitude = entry.get("magnitude", "none")
+            unit = entry.get("unit", "none")
+            
+            v_type = tm.translate("Vector") if count > 1 else tm.translate("Escalar") if count == 1 else tm.translate("Vacío")
+            
+            # Badge para el número si tiene datos
+            num_badge = ft.Container(
+                content=ft.Text(str(i+1), size=10, weight=ft.FontWeight.BOLD, color=themes.actual_theme["on_primary"]),
+                bgcolor=themes.actual_theme["primary"],
+                padding=ft.Padding(6, 2, 6, 2),
+                border_radius=5,
+                visible=count > 0
+            )
+
+            card = ft.Container(
+                content=ft.Column([
+                    ft.Row([
+                        num_badge,
+                        ft.Text(name, size=18, weight=ft.FontWeight.BOLD, expand=True),
+                        ft.IconButton(ft.Icons.SETTINGS, on_click=lambda e: _open_settings_modal(e), size=18, color=themes.actual_theme["secondary"]),
+                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                    ft.Divider(height=10, thickness=0.5, color=ft.Colors.with_opacity(0.1, themes.actual_theme["on_surface"])),
+                    ft.Row([
+                        ft.Column([
+                            ft.Text(tm.translate("Tipo"), size=10, color=ft.Colors.with_opacity(0.6, themes.actual_theme["on_surface"])),
+                            ft.Text(v_type, size=12, weight=ft.FontWeight.W_500),
+                        ], spacing=2),
+                        ft.Column([
+                            ft.Text(tm.translate("Datos"), size=10, color=ft.Colors.with_opacity(0.6, themes.actual_theme["on_surface"])),
+                            ft.Text(str(count), size=12, weight=ft.FontWeight.BOLD),
+                        ], spacing=2, horizontal_alignment=ft.CrossAxisAlignment.END),
+                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                    ft.Row([
+                        ft.Column([
+                            ft.Text(tm.translate("Magnitud"), size=10, color=ft.Colors.with_opacity(0.6, themes.actual_theme["on_surface"])),
+                            ft.Text(magnitude if magnitude != "none" else "-", size=12),
+                        ], spacing=2),
+                        ft.Column([
+                            ft.Text(tm.translate("Unidad"), size=10, color=ft.Colors.with_opacity(0.6, themes.actual_theme["on_surface"])),
+                            ft.Text(unit if unit != "none" else "-", size=12),
+                        ], spacing=2, horizontal_alignment=ft.CrossAxisAlignment.END),
+                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                ], spacing=15),
+                width=220,
+                height=150,
+                padding=15,
+                border_radius=15,
+                bgcolor=ft.Colors.with_opacity(0.08, themes.actual_theme["on_surface"]),
+                border=ft.Border.all(1, ft.Colors.with_opacity(0.1, themes.actual_theme["on_surface"])),
+            )
+            cards.append(card)
+            
+        return ft.Container(
+            content=ft.Column([
+                ft.Row([
+                    ft.Icon(ft.Icons.GRID_VIEW_ROUNDED, color=themes.actual_theme["primary"], size=28),
+                    ft.Text(tm.translate("Inventario de Variables"), size=22, weight=ft.FontWeight.BOLD),
+                ], spacing=15),
+                ft.Text(tm.translate("Vista general de todas las colecciones de datos en la sesión actual."), size=13, color=ft.Colors.with_opacity(0.6, themes.actual_theme["on_surface"])),
+                ft.Divider(height=30, thickness=1, color=ft.Colors.with_opacity(0.1, themes.actual_theme["on_surface"])),
+                ft.Row(
+                    controls=cards,
+                    spacing=20,
+                    run_spacing=20,
+                    alignment=ft.MainAxisAlignment.START,
+                    wrap=True
+                )
+            ], scroll=ft.ScrollMode.ADAPTIVE, spacing=10),
+            padding=30,
+            expand=True,
+        )
 
     def _make_column(name: str) -> EditableColumn:
         return EditableColumn(
@@ -118,10 +208,14 @@ async def EditorScreen(data: fr.DataSystem, themes):
     def _rebuild_columns_row():
         """Rebuild columns_row for the active tab."""
         columns_row.controls.clear()
-        for var_name in _current_tab()["columns"]:
-            if var_name in pool:
-                columns_row.controls.append(_make_column(var_name))
-        columns_row.controls.append(add_column_card)
+        curr = _current_tab()
+        if curr.get("id") == "fixed_summary":
+            columns_row.controls.append(_build_summary_view())
+        else:
+            for var_name in curr["columns"]:
+                if var_name in pool:
+                    columns_row.controls.append(_make_column(var_name))
+            columns_row.controls.append(add_column_card)
         _try_update(columns_row)
 
     async def add_ui_column(e=None):
@@ -175,44 +269,48 @@ async def EditorScreen(data: fr.DataSystem, themes):
         tabs_row.controls.clear()
         for i, tab in enumerate(tabs):
             is_active = i == active_index[0]
+            is_fixed = tab.get("fixed", False)
+            
+            controls = [
+                ft.Text(
+                    tab["name"],
+                    size=13,
+                    weight=ft.FontWeight.W_600 if is_active else ft.FontWeight.NORMAL,
+                    color=themes.actual_theme["primary"]
+                    if is_active
+                    else ft.Colors.with_opacity(0.7, themes.actual_theme["on_surface"]),
+                )
+            ]
+            
+            if not is_fixed:
+                controls.extend([
+                    ft.IconButton(
+                        icon=ft.Icons.EDIT_OUTLINED,
+                        icon_size=12,
+                        icon_color=ft.Colors.with_opacity(
+                            0.5, themes.actual_theme["on_surface"]
+                        ),
+                        on_click=lambda e, idx=i: _rename_tab(idx),
+                        tooltip=tm.translate("Renombrar pestaña"),
+                        width=24,
+                        height=24,
+                    ),
+                    ft.IconButton(
+                        icon=ft.Icons.CLOSE,
+                        icon_size=12,
+                        icon_color=ft.Colors.with_opacity(
+                            0.5, themes.actual_theme["on_surface"]
+                        ),
+                        on_click=lambda e, idx=i: _delete_tab(idx),
+                        tooltip=tm.translate("Eliminar pestaña"),
+                        width=24,
+                        height=24,
+                    ),
+                ])
+
             tab_btn = ft.Container(
                 content=ft.Row(
-                    [
-                        ft.Text(
-                            tab["name"],
-                            size=13,
-                            weight=ft.FontWeight.W_600
-                            if is_active
-                            else ft.FontWeight.NORMAL,
-                            color=themes.actual_theme["primary"]
-                            if is_active
-                            else ft.Colors.with_opacity(
-                                0.7, themes.actual_theme["on_surface"]
-                            ),
-                        ),
-                        ft.IconButton(
-                            icon=ft.Icons.EDIT_OUTLINED,
-                            icon_size=12,
-                            icon_color=ft.Colors.with_opacity(
-                                0.5, themes.actual_theme["on_surface"]
-                            ),
-                            on_click=lambda e, idx=i: _rename_tab(idx),
-                            tooltip=tm.translate("Renombrar pestaña"),
-                            width=24,
-                            height=24,
-                        ),
-                        ft.IconButton(
-                            icon=ft.Icons.CLOSE,
-                            icon_size=12,
-                            icon_color=ft.Colors.with_opacity(
-                                0.5, themes.actual_theme["on_surface"]
-                            ),
-                            on_click=lambda e, idx=i: _delete_tab(idx),
-                            tooltip=tm.translate("Eliminar pestaña"),
-                            width=24,
-                            height=24,
-                        ),
-                    ],
+                    controls,
                     spacing=2,
                     tight=True,
                 ),
@@ -236,7 +334,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
                     ),
                 ),
                 on_click=lambda e, idx=i: _switch_tab(idx),
-                data=f"tab_{i}",
+                data=i, # Usar el índice directamente
             )
 
             draggable = ft.Draggable(
@@ -281,8 +379,8 @@ async def EditorScreen(data: fr.DataSystem, themes):
         _switch_tab(len(tabs) - 1)
 
     def _delete_tab(idx: int):
-        if len(tabs) <= 1:
-            return  # always keep at least one tab
+        if tabs[idx].get("fixed") or len(tabs) <= 1:
+            return  # always keep at least one tab and don't delete fixed tabs
         tabs.pop(idx)
         new_active = min(active_index[0], len(tabs) - 1)
         active_index[0] = new_active
@@ -291,6 +389,8 @@ async def EditorScreen(data: fr.DataSystem, themes):
         update_shared_state()
 
     def _rename_tab(idx: int):
+        if tabs[idx].get("fixed"):
+            return
         def _close_dlg(e):
             rename_dlg.open = False
             data.page.update()
@@ -320,13 +420,13 @@ async def EditorScreen(data: fr.DataSystem, themes):
         data.page.update()
 
     def _move_tab(e, target_idx: int):
+        if target_idx == 0:
+            return
         src_ctrl = data.page.get_control(e.src_id)
         if not src_ctrl:
             return
         src_idx = src_ctrl.data
-        if type(src_idx) is not int:
-            return
-        if src_idx == target_idx:
+        if src_idx == 0 or src_idx == target_idx:
             return
 
         active_id = tabs[active_index[0]]["id"]

@@ -24,19 +24,19 @@ async def open_create_column_modal(
 
     mag_dropdown = dropdown(
         label=tm.translate("Magnitud"),
-        options=[ft.dropdown.Option("none")] + [ft.dropdown.Option(m) for m in default_units],
+        options=[ft.DropdownOption("none")] + [ft.DropdownOption(m) for m in default_units],
         value="none",
     )
     unit_dropdown = dropdown(
         label=tm.translate("Unidad"),
-        options=[ft.dropdown.Option("none")],
+        options=[ft.DropdownOption("none")],
         value="none",
     )
 
     def on_mag_change(e):
         mag = mag_dropdown.value
-        unit_dropdown.options = [ft.dropdown.Option("none")] + [
-            ft.dropdown.Option(u) for u in default_units.get(mag, {})
+        unit_dropdown.options = [ft.DropdownOption("none")] + [
+            ft.DropdownOption(u) for u in default_units.get(mag, {})
         ]
         unit_dropdown.value = "none"
         try:
