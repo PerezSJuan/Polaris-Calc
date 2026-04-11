@@ -3,11 +3,12 @@ import flet as ft
 import flet_base.router as fr
 from flet_base.translations import instance_translation_manager as tm
 
+from flet_base.components.buttons import icon_btn, text_btn
+from flet_base.components.texts import body, subtitle
+
 from screens.editor.utils import normalize_editor_data
 from screens.editor.column import EditableColumn
 from screens.editor.modals import open_create_column_modal
-
-from screens.editor.modals import open_settings_modal as _open_settings_modal
 
 
 async def EditorScreen(data: fr.DataSystem, themes):
@@ -23,6 +24,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
             "values": col["values"],
             "magnitude": col["magnitude"],
             "unit": col["unit"],
+            "description": col.get("description", ""),
         }
         for col in normalized["columns"]
     }
@@ -36,7 +38,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
         "id": "fixed_summary",
         "name": tm.translate("Resumen"),
         "columns": [],
-        "fixed": True
+        "fixed": True,
     }
 
     tabs: list[dict] = [summary_tab] + [
@@ -44,9 +46,10 @@ async def EditorScreen(data: fr.DataSystem, themes):
             "id": str(uuid.uuid4()),
             "name": t["name"],
             "columns": list(t.get("columns", [])),
-            "fixed": False
+            "fixed": False,
         }
-        for t in raw_tabs if t.get("id") != "fixed_summary"
+        for t in raw_tabs
+        if t.get("id") != "fixed_summary"
     ]
     # Shift active index to account for summary tab at 0
     saved_active = normalized["layout"].get("active_tab_index", 0)
@@ -89,72 +92,170 @@ async def EditorScreen(data: fr.DataSystem, themes):
             count = len(values)
             magnitude = entry.get("magnitude", "none")
             unit = entry.get("unit", "none")
-            
-            v_type = tm.translate("Vector") if count > 1 else tm.translate("Escalar") if count == 1 else tm.translate("Vacío")
-            
+            description = entry.get("description", "")
+
+            v_type = (
+                tm.translate("Vector")
+                if count > 1
+                else tm.translate("Escalar")
+                if count == 1
+                else tm.translate("Vacío")
+            )
+
             # Badge para el número si tiene datos
             num_badge = ft.Container(
-                content=ft.Text(str(i+1), size=10, weight=ft.FontWeight.BOLD, color=themes.actual_theme["on_primary"]),
+                content=body(
+                    str(i + 1), size=10, color=themes.actual_theme["on_primary"]
+                ),
                 bgcolor=themes.actual_theme["primary"],
                 padding=ft.Padding(6, 2, 6, 2),
                 border_radius=5,
-                visible=count > 0
+                visible=count > 0,
             )
 
             card = ft.Container(
-                content=ft.Column([
-                    ft.Row([
-                        num_badge,
-                        ft.Text(name, size=18, weight=ft.FontWeight.BOLD, expand=True),
-                        ft.IconButton(ft.Icons.SETTINGS, on_click=lambda e: _open_settings_modal(e), size=18, color=themes.actual_theme["secondary"]),
-                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-                    ft.Divider(height=10, thickness=0.5, color=ft.Colors.with_opacity(0.1, themes.actual_theme["on_surface"])),
-                    ft.Row([
-                        ft.Column([
-                            ft.Text(tm.translate("Tipo"), size=10, color=ft.Colors.with_opacity(0.6, themes.actual_theme["on_surface"])),
-                            ft.Text(v_type, size=12, weight=ft.FontWeight.W_500),
-                        ], spacing=2),
-                        ft.Column([
-                            ft.Text(tm.translate("Datos"), size=10, color=ft.Colors.with_opacity(0.6, themes.actual_theme["on_surface"])),
-                            ft.Text(str(count), size=12, weight=ft.FontWeight.BOLD),
-                        ], spacing=2, horizontal_alignment=ft.CrossAxisAlignment.END),
-                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-                    ft.Row([
-                        ft.Column([
-                            ft.Text(tm.translate("Magnitud"), size=10, color=ft.Colors.with_opacity(0.6, themes.actual_theme["on_surface"])),
-                            ft.Text(magnitude if magnitude != "none" else "-", size=12),
-                        ], spacing=2),
-                        ft.Column([
-                            ft.Text(tm.translate("Unidad"), size=10, color=ft.Colors.with_opacity(0.6, themes.actual_theme["on_surface"])),
-                            ft.Text(unit if unit != "none" else "-", size=12),
-                        ], spacing=2, horizontal_alignment=ft.CrossAxisAlignment.END),
-                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-                ], spacing=15),
+                content=ft.Column(
+                    [
+                        ft.Row(
+                            [
+                                num_badge,
+                                body(name, size=18),
+                                ft.Icon(
+                                    ft.Icons.LAYERS_OUTLINED,
+                                    size=18,
+                                    color=themes.actual_theme["secondary"],
+                                ),
+                            ],
+                            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                        ),
+                        body(
+                            description,
+                            size=11,
+                            color=ft.Colors.with_opacity(
+                                0.7, themes.actual_theme["on_surface"]
+                            ),
+                        ),
+                        ft.Divider(
+                            height=10,
+                            thickness=0.5,
+                            color=ft.Colors.with_opacity(
+                                0.1, themes.actual_theme["on_surface"]
+                            ),
+                        ),
+                        ft.Row(
+                            [
+                                ft.Column(
+                                    [
+                                        body(
+                                            tm.translate("Tipo"),
+                                            size=10,
+                                            color=ft.Colors.with_opacity(
+                                                0.6, themes.actual_theme["on_surface"]
+                                            ),
+                                        ),
+                                        body(v_type, size=12),
+                                    ],
+                                    spacing=2,
+                                ),
+                                ft.Column(
+                                    [
+                                        body(
+                                            tm.translate("Datos"),
+                                            size=10,
+                                            color=themes.actual_theme["on_surface"],
+                                        ),
+                                        body(str(count), size=12),
+                                    ],
+                                    spacing=2,
+                                    horizontal_alignment=ft.CrossAxisAlignment.END,
+                                ),
+                            ],
+                            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                        ),
+                        ft.Row(
+                            [
+                                ft.Column(
+                                    [
+                                        body(
+                                            tm.translate("Magnitud"),
+                                            size=10,
+                                            color=themes.actual_theme["on_surface"],
+                                        ),
+                                        body(
+                                            magnitude if magnitude != "none" else "-",
+                                            size=12,
+                                        ),
+                                    ],
+                                    spacing=2,
+                                ),
+                                ft.Column(
+                                    [
+                                        body(
+                                            tm.translate("Unidad"),
+                                            size=10,
+                                            color=themes.actual_theme["on_surface"],
+                                        ),
+                                        body(unit if unit != "none" else "-", size=12),
+                                    ],
+                                    spacing=2,
+                                    horizontal_alignment=ft.CrossAxisAlignment.END,
+                                ),
+                            ],
+                            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                        ),
+                    ],
+                    spacing=10,
+                ),
                 width=220,
-                height=150,
+                height=170,
                 padding=15,
                 border_radius=15,
                 bgcolor=ft.Colors.with_opacity(0.08, themes.actual_theme["on_surface"]),
-                border=ft.Border.all(1, ft.Colors.with_opacity(0.1, themes.actual_theme["on_surface"])),
+                border=ft.Border.all(
+                    1, ft.Colors.with_opacity(0.1, themes.actual_theme["on_surface"])
+                ),
             )
             cards.append(card)
-            
+
         return ft.Container(
-            content=ft.Column([
-                ft.Row([
-                    ft.Icon(ft.Icons.GRID_VIEW_ROUNDED, color=themes.actual_theme["primary"], size=28),
-                    ft.Text(tm.translate("Inventario de Variables"), size=22, weight=ft.FontWeight.BOLD),
-                ], spacing=15),
-                ft.Text(tm.translate("Vista general de todas las colecciones de datos en la sesión actual."), size=13, color=ft.Colors.with_opacity(0.6, themes.actual_theme["on_surface"])),
-                ft.Divider(height=30, thickness=1, color=ft.Colors.with_opacity(0.1, themes.actual_theme["on_surface"])),
-                ft.Row(
-                    controls=cards,
-                    spacing=20,
-                    run_spacing=20,
-                    alignment=ft.MainAxisAlignment.START,
-                    wrap=True
-                )
-            ], scroll=ft.ScrollMode.ADAPTIVE, spacing=10),
+            content=ft.Column(
+                [
+                    ft.Row(
+                        [
+                            ft.Icon(
+                                ft.Icons.GRID_VIEW_ROUNDED,
+                                color=themes.actual_theme["primary"],
+                                size=28,
+                            ),
+                            subtitle(tm.translate("Inventario de Variables"), size=22),
+                        ],
+                        spacing=15,
+                    ),
+                    body(
+                        tm.translate(
+                            "Vista general de todas las colecciones de datos en la sesión actual."
+                        ),
+                        size=13,
+                        color=themes.actual_theme["on_surface"],
+                    ),
+                    ft.Divider(
+                        height=30,
+                        thickness=1,
+                        color=ft.Colors.with_opacity(
+                            0.1, themes.actual_theme["on_surface"]
+                        ),
+                    ),
+                    ft.Row(
+                        controls=cards,
+                        spacing=20,
+                        run_spacing=20,
+                        alignment=ft.MainAxisAlignment.START,
+                        wrap=True,
+                    ),
+                ],
+                scroll=ft.ScrollMode.ADAPTIVE,
+                spacing=10,
+            ),
             padding=30,
             expand=True,
         )
@@ -239,7 +340,12 @@ async def EditorScreen(data: fr.DataSystem, themes):
 
     async def clear_all(e=None):
         pool.clear()
-        pool["V1"] = {"values": [], "magnitude": "none", "unit": "none"}
+        pool["V1"] = {
+            "values": [],
+            "magnitude": "none",
+            "unit": "none",
+            "description": "",
+        }
         for t in tabs:
             t["columns"] = ["V1"]
         _rebuild_columns_row()
@@ -270,51 +376,57 @@ async def EditorScreen(data: fr.DataSystem, themes):
         for i, tab in enumerate(tabs):
             is_active = i == active_index[0]
             is_fixed = tab.get("fixed", False)
-            
-            controls = [
+
+            controls = []
+            if is_fixed:
+                controls.append(
+                    ft.Icon(
+                        ft.Icons.GRID_VIEW_ROUNDED,
+                        size=20 if is_fixed else 16,
+                        color=themes.actual_theme["primary"]
+                        if is_active
+                        else ft.Colors.with_opacity(
+                            0.7, themes.actual_theme["on_surface"]
+                        ),
+                    )
+                )
+
+            controls.append(
                 ft.Text(
                     tab["name"],
-                    size=13,
-                    weight=ft.FontWeight.W_600 if is_active else ft.FontWeight.NORMAL,
+                    size=14 if is_fixed else 11,
+                    weight=ft.FontWeight.W_600 if is_active or is_fixed else ft.FontWeight.NORMAL,
                     color=themes.actual_theme["primary"]
                     if is_active
                     else ft.Colors.with_opacity(0.7, themes.actual_theme["on_surface"]),
                 )
-            ]
-            
+            )
+
             if not is_fixed:
-                controls.extend([
-                    ft.IconButton(
-                        icon=ft.Icons.EDIT_OUTLINED,
-                        icon_size=12,
-                        icon_color=ft.Colors.with_opacity(
-                            0.5, themes.actual_theme["on_surface"]
+                controls.extend(
+                    [
+                        icon_btn(
+                            icon=ft.Icons.EDIT_OUTLINED,
+                            on_click=lambda e, idx=i: _rename_tab(idx),
+                            icon_size=14,
                         ),
-                        on_click=lambda e, idx=i: _rename_tab(idx),
-                        tooltip=tm.translate("Renombrar pestaña"),
-                        width=24,
-                        height=24,
-                    ),
-                    ft.IconButton(
-                        icon=ft.Icons.CLOSE,
-                        icon_size=12,
-                        icon_color=ft.Colors.with_opacity(
-                            0.5, themes.actual_theme["on_surface"]
+                        icon_btn(
+                            icon=ft.Icons.CLOSE,
+                            on_click=lambda e, idx=i: _delete_tab(idx),
+                            icon_size=14,
                         ),
-                        on_click=lambda e, idx=i: _delete_tab(idx),
-                        tooltip=tm.translate("Eliminar pestaña"),
-                        width=24,
-                        height=24,
-                    ),
-                ])
+                    ]
+                )
 
             tab_btn = ft.Container(
                 content=ft.Row(
                     controls,
-                    spacing=2,
+                    spacing=6 if is_fixed else 2,
                     tight=True,
                 ),
-                padding=ft.Padding.symmetric(horizontal=12, vertical=6),
+                padding=ft.Padding.symmetric(
+                    horizontal=18 if is_fixed else 8, vertical=10 if is_fixed else 4
+                ),
                 border_radius=ft.BorderRadius(6, 6, 0, 0),
                 bgcolor=themes.actual_theme["on_primary"]
                 if is_active
@@ -334,7 +446,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
                     ),
                 ),
                 on_click=lambda e, idx=i: _switch_tab(idx),
-                data=i, # Usar el índice directamente
+                data=i,  # Usar el índice directamente
             )
 
             draggable = ft.Draggable(
@@ -353,12 +465,10 @@ async def EditorScreen(data: fr.DataSystem, themes):
 
         # "+" button to add a new tab
         tabs_row.controls.append(
-            ft.IconButton(
+            icon_btn(
                 icon=ft.Icons.ADD,
-                icon_size=16,
-                icon_color=themes.actual_theme["primary"],
                 on_click=_add_tab,
-                tooltip=tm.translate("Nueva pestaña"),
+                icon_size=18,
             )
         )
         _try_update(tabs_row)
@@ -391,6 +501,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
     def _rename_tab(idx: int):
         if tabs[idx].get("fixed"):
             return
+
         def _close_dlg(e):
             rename_dlg.open = False
             data.page.update()
@@ -407,11 +518,11 @@ async def EditorScreen(data: fr.DataSystem, themes):
             value=tabs[idx]["name"], autofocus=True, on_submit=_save_name
         )
         rename_dlg = ft.AlertDialog(
-            title=ft.Text(tm.translate("Renombrar pestaña")),
+            title=body(tm.translate("Renombrar pestaña")),
             content=rename_field,
             actions=[
-                ft.TextButton(tm.translate("Cancelar"), on_click=_close_dlg),
-                ft.TextButton(tm.translate("Guardar"), on_click=_save_name),
+                text_btn(tm.translate("Cancelar"), on_click=_close_dlg),
+                text_btn(tm.translate("Guardar"), on_click=_save_name),
             ],
             actions_alignment=ft.MainAxisAlignment.END,
         )
@@ -443,13 +554,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
     # "+" column card  (defined here so _rebuild_columns_row can use it)
     # ------------------------------------------------------------------
     add_column_card = ft.Container(
-        content=ft.IconButton(
-            icon=ft.Icons.ADD_ROUNDED,
-            icon_size=40,
-            icon_color=themes.actual_theme["primary"],
-            on_click=add_ui_column,
-            tooltip=tm.translate("Añadir columna visual"),
-        ),
+        content=icon_btn(icon=ft.Icons.ADD_ROUNDED, on_click=add_ui_column),
         width=180,
         height=450,
         border=ft.Border.all(

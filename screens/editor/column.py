@@ -20,6 +20,17 @@ class EditableColumn(ft.Container):
         self.themes = themes
         self._just_changed = False
 
+        self.description_field = ft.TextField(
+            label=tm.translate("Descripción"),
+            value=self._entry.get("description", ""),
+            on_change=self._on_description_change,
+            border_radius=8,
+            text_size=13,
+            multiline=True,
+            min_lines=1,
+            max_lines=3,
+        )
+
         self.width = 180
         self.padding = 15
         self.border_radius = 12
@@ -168,6 +179,7 @@ class EditableColumn(ft.Container):
         self.mag_dropdown.value = entry.get("magnitude", "none")
         self.unit_dropdown.options = self._get_unit_options(self.mag_dropdown.value)
         self.unit_dropdown.value = entry.get("unit", "none")
+        self.description_field.value = entry.get("description", "")
         self._update_header()
 
     def _update_header(self):
@@ -229,6 +241,7 @@ class EditableColumn(ft.Container):
             ],
             "magnitude": entry.get("magnitude", "none"),
             "unit": entry.get("unit", "none"),
+            "description": self.description_field.value,
         }
 
     def get_export_data(self):
@@ -238,6 +251,7 @@ class EditableColumn(ft.Container):
             "values": entry.get("values", []),
             "magnitude": entry.get("magnitude", "none"),
             "unit": entry.get("unit", "none"),
+            "description": entry.get("description", ""),
         }
 
     # ------------------------------------------------------------------ #
@@ -276,6 +290,10 @@ class EditableColumn(ft.Container):
         self._update_header()
         self._notify_change()
 
+    def _on_description_change(self, e):
+        self.pool[self.current_name]["description"] = self.description_field.value
+        self._notify_change()
+
     def _open_settings_modal(self, e):
         page = self.page
         if not page:
@@ -288,6 +306,7 @@ class EditableColumn(ft.Container):
                         f"{tm.translate('Variable')}: {self.current_name}",
                         weight=ft.FontWeight.BOLD,
                     ),
+                    self.description_field,
                     self.mag_dropdown,
                     self.unit_dropdown,
                 ],

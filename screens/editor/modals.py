@@ -21,6 +21,9 @@ async def open_create_column_modal(
     themes,
 ):
     name_field = text_input(placeholder=tm.translate("Nombre variable (ej: x, V1...)"))
+    desc_field = text_input(
+        placeholder=tm.translate("Descripción (opcional)"), multiline=True, max_lines=3
+    )
 
     mag_dropdown = dropdown(
         label=tm.translate("Magnitud"),
@@ -55,6 +58,7 @@ async def open_create_column_modal(
             "values": [],
             "magnitude": mag_dropdown.value,
             "unit": unit_dropdown.value,
+            "description": desc_field.value.strip(),
         }
 
         new_col = EditableColumn(
@@ -80,11 +84,18 @@ async def open_create_column_modal(
             pass
 
         page.pop_dialog()
+        try:
+            page.update()
+        except Exception:
+            pass
+
+    name_field.on_submit = save_new_column
+    desc_field.on_submit = save_new_column
 
     page.show_dialog(
         modal(
             title_str=tm.translate("Nueva columna de datos"),
-            content=[name_field, mag_dropdown, unit_dropdown],
+            content=[name_field, desc_field, mag_dropdown, unit_dropdown],
             actions=[
                 filled_btn(tm.translate("Crear"), on_click=save_new_column),
                 filled_btn(tm.translate("Cancelar"), on_click=lambda _: page.pop_dialog()),

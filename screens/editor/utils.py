@@ -65,13 +65,24 @@ def _normalize_columns(raw) -> list[dict]:
                 values = col.get("data") if isinstance(col.get("data"), list) else []
             magnitude = col.get("magnitude", "none")
             unit = col.get("unit", "none")
+            description = col.get("description", "")
         elif isinstance(col, list):
-            name, values, magnitude, unit = f"V{i + 1}", col, "none", "none"
+            name, values, magnitude, unit, description = f"V{i + 1}", col, "none", "none", ""
         else:
             continue
-        columns.append({"name": str(name), "values": values, "magnitude": magnitude, "unit": unit})
+        columns.append(
+            {
+                "name": str(name),
+                "values": values,
+                "magnitude": magnitude,
+                "unit": unit,
+                "description": description,
+            }
+        )
 
-    return columns or [{"name": "V1", "values": [], "magnitude": "none", "unit": "none"}]
+    return columns or [
+        {"name": "V1", "values": [], "magnitude": "none", "unit": "none", "description": ""}
+    ]
 
 
 def _normalize_layout(layout, columns_data) -> dict:
