@@ -5,7 +5,7 @@ from flet_base.components.modals import modal
 from flet_base.components.buttons import filled_btn
 from flet_base.components.inputs import dropdown
 
-from screens.editor.utils import load_default_units
+from screens.editor.utils.utils import load_default_units
 
 default_units = load_default_units()
 

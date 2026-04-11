@@ -2,10 +2,11 @@ import flet as ft
 from flet_base.translations import instance_translation_manager as tm
 from flet_base.components.inputs import dropdown, text_input
 from flet_base.components.modals import modal
-from flet_base.components.buttons import filled_btn
+from flet_base.components.buttons import filled_btn, text_btn
+from flet_base.components.texts import body
 
-from screens.editor.column import EditableColumn
-from screens.editor.utils import load_default_units
+from screens.editor.components.column import EditableColumn
+from screens.editor.utils.utils import load_default_units
 
 default_units = load_default_units()
 
@@ -99,6 +100,32 @@ async def open_create_column_modal(
             actions=[
                 filled_btn(tm.translate("Crear"), on_click=save_new_column),
                 filled_btn(tm.translate("Cancelar"), on_click=lambda _: page.pop_dialog()),
+            ],
+        )
+    )
+
+
+async def open_rename_tab_modal(page, current_name, on_save):
+    """
+    Opens a modal to rename a tab.
+    """
+    rename_field = text_input(value=current_name, autofocus=True)
+
+    def _on_save(e):
+        new_name = rename_field.value.strip()
+        if new_name:
+            on_save(new_name)
+        page.pop_dialog()
+
+    rename_field.on_submit = _on_save
+
+    page.show_dialog(
+        modal(
+            title_str=tm.translate("Renombrar pestaña"),
+            content=[rename_field],
+            actions=[
+                text_btn(tm.translate("Cancelar"), on_click=lambda _: page.pop_dialog()),
+                text_btn(tm.translate("Guardar"), on_click=_on_save),
             ],
         )
     )
