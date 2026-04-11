@@ -1,11 +1,20 @@
 import flet as ft
 from flet_base.translations import instance_translation_manager as tm
 from flet_base.components.texts import body, subtitle
+from flet_base.components.buttons import icon_btn
+from functools import partial
 
-def SummaryView(pool, themes):
+
+def SummaryView(pool, themes, on_open_settings=None):
     """
     Returns a view showing a summary card for each variable in the pool.
     """
+
+    async def _handle_open_settings(var_name, e):
+        # var_name se pasa a través de functools.partial
+        if on_open_settings:
+            await on_open_settings(var_name)
+
     cards = []
     for i, (name, entry) in enumerate(pool.items()):
         values = entry.get("values", [])
@@ -24,9 +33,7 @@ def SummaryView(pool, themes):
 
         # Badge para el número si tiene datos
         num_badge = ft.Container(
-            content=body(
-                str(i + 1), size=10, color=themes.actual_theme["on_primary"]
-            ),
+            content=body(str(i + 1), size=10, color=themes.actual_theme["on_primary"]),
             bgcolor=themes.actual_theme["primary"],
             padding=ft.Padding(6, 2, 6, 2),
             border_radius=5,
@@ -40,20 +47,26 @@ def SummaryView(pool, themes):
                         [
                             num_badge,
                             body(name, size=18),
-                            ft.Icon(
-                                ft.Icons.LAYERS_OUTLINED,
-                                size=18,
-                                color=themes.actual_theme["secondary"],
+                            icon_btn(
+                                ft.Icons.SETTINGS,
+                                icon_size=18,
+                                # Usamos partial para pasar el nombre sin ensuciar el atributo 'data' del botón
+                                on_click=partial(_handle_open_settings, name),
                             ),
                         ],
                         alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                     ),
-                    body(
-                        description,
-                        size=11,
-                        color=ft.Colors.with_opacity(
-                            0.7, themes.actual_theme["on_surface"]
+                    ft.Container(
+                        content=body(
+                            description
+                            if description
+                            else tm.translate("Sin descripción"),
+                            size=11,
+                            color=ft.Colors.with_opacity(
+                                0.7, themes.actual_theme["on_surface"]
+                            ),
                         ),
+                        height=35,  # Forzar un espacio para la descripción
                     ),
                     ft.Divider(
                         height=10,
@@ -123,11 +136,12 @@ def SummaryView(pool, themes):
                         ],
                         alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                     ),
+                    ft.Container(height=12),  # Espacio extra abajo
                 ],
-                spacing=10,
+                spacing=8,
             ),
             width=220,
-            height=170,
+            height=200,
             padding=15,
             border_radius=15,
             bgcolor=ft.Colors.with_opacity(0.08, themes.actual_theme["on_surface"]),

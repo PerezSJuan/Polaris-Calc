@@ -4,11 +4,14 @@ import flet_base.router as fr
 from flet_base.translations import instance_translation_manager as tm
 
 from flet_base.components.buttons import icon_btn
-from flet_base.components.texts import body
 
 from screens.editor.utils.utils import normalize_editor_data
 from screens.editor.components.column import EditableColumn
-from screens.editor.modals.modals import open_create_column_modal, open_rename_tab_modal
+from screens.editor.modals.modals import (
+    open_create_column_modal,
+    open_rename_tab_modal,
+    open_variable_settings_modal,
+)
 from screens.editor.components.summary_view import SummaryView
 from screens.editor.components.tab_bar import EditorTabBar
 
@@ -63,7 +66,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
     # UI Containers
     # ------------------------------------------------------------------
     tab_bar_container = ft.Container()
-    
+
     columns_row = ft.Row(
         scroll=ft.ScrollMode.ADAPTIVE,
         vertical_alignment=ft.CrossAxisAlignment.START,
@@ -151,7 +154,15 @@ async def EditorScreen(data: fr.DataSystem, themes):
         columns_row.controls.clear()
         curr = _current_tab()
         if curr.get("id") == "fixed_summary":
-            columns_row.controls.append(SummaryView(pool, themes))
+            columns_row.controls.append(
+                SummaryView(
+                    pool,
+                    themes,
+                    on_open_settings=lambda name: open_variable_settings_modal(
+                        data.page, name, pool, on_column_data_changed
+                    ),
+                )
+            )
         else:
             for var_name in curr["columns"]:
                 if var_name in pool:
@@ -197,17 +208,20 @@ async def EditorScreen(data: fr.DataSystem, themes):
         await open_rename_tab_modal(data.page, tabs[idx]["name"], save_name)
 
     def _move_tab(e, target_idx: int):
-        if target_idx == 0: return
+        if target_idx == 0:
+            return
         src_ctrl = data.page.get_control(e.src_id)
-        if not src_ctrl: return
+        if not src_ctrl:
+            return
         src_idx = src_ctrl.data
-        if src_idx == 0 or src_idx == target_idx: return
+        if src_idx == 0 or src_idx == target_idx:
+            return
 
         active_id = tabs[active_index[0]]["id"]
         moved_tab = tabs.pop(src_idx)
         tabs.insert(target_idx, moved_tab)
         active_index[0] = next(i for i, t in enumerate(tabs) if t["id"] == active_id)
-        
+
         _refresh_ui()
         update_shared_state()
 

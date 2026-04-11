@@ -3,7 +3,6 @@ from flet_base.translations import instance_translation_manager as tm
 from flet_base.components.inputs import dropdown, text_input
 from flet_base.components.modals import modal
 from flet_base.components.buttons import filled_btn, text_btn
-from flet_base.components.texts import body
 
 from screens.editor.components.column import EditableColumn
 from screens.editor.utils.utils import load_default_units
@@ -28,7 +27,8 @@ async def open_create_column_modal(
 
     mag_dropdown = dropdown(
         label=tm.translate("Magnitud"),
-        options=[ft.DropdownOption("none")] + [ft.DropdownOption(m) for m in default_units],
+        options=[ft.DropdownOption("none")]
+        + [ft.DropdownOption(m) for m in default_units],
         value="none",
     )
     unit_dropdown = dropdown(
@@ -99,7 +99,9 @@ async def open_create_column_modal(
             content=[name_field, desc_field, mag_dropdown, unit_dropdown],
             actions=[
                 filled_btn(tm.translate("Crear"), on_click=save_new_column),
-                filled_btn(tm.translate("Cancelar"), on_click=lambda _: page.pop_dialog()),
+                filled_btn(
+                    tm.translate("Cancelar"), on_click=lambda _: page.pop_dialog()
+                ),
             ],
         )
     )
@@ -124,8 +126,94 @@ async def open_rename_tab_modal(page, current_name, on_save):
             title_str=tm.translate("Renombrar pestaña"),
             content=[rename_field],
             actions=[
-                text_btn(tm.translate("Cancelar"), on_click=lambda _: page.pop_dialog()),
+                text_btn(
+                    tm.translate("Cancelar"), on_click=lambda _: page.pop_dialog()
+                ),
                 text_btn(tm.translate("Guardar"), on_click=_on_save),
+            ],
+        )
+    )
+
+
+async def open_variable_settings_modal(
+    page,
+    var_name,
+    pool,
+    on_change,
+):
+    """
+    Opens a modal to configure a variable's magnitude, unit, and description.
+    Updates are live-editing, following the pattern of the matrix editor.
+    """
+    entry = pool.get(var_name, {})
+
+    def _on_desc_change(e):
+        pool[var_name]["description"] = desc_field.value.strip()
+        on_change()
+
+    desc_field = ft.TextField(
+        label=tm.translate("Descripción"),
+        value=entry.get("description", ""),
+        on_change=_on_desc_change,
+        border_radius=8,
+        text_size=13,
+        multiline=True,
+        min_lines=1,
+        max_lines=3,
+    )
+
+    async def get_unit_options(mag):
+        base = [ft.DropdownOption("none")]
+        if mag == "none" or mag not in default_units:
+            return base
+        return base + [ft.DropdownOption(u) for u in default_units[mag]]
+
+    def _on_unit_change(e):
+        pool[var_name]["unit"] = unit_dropdown.value
+        on_change()
+
+    unit_dropdown = dropdown(
+        label=tm.translate("Unidad"),
+        options=await get_unit_options(entry.get("magnitude", "none")),
+        value=entry.get("unit", "none"),
+        on_change=_on_unit_change,
+    )
+
+    async def _on_mag_change(e):
+        mag = mag_dropdown.value
+        pool[var_name]["magnitude"] = mag
+        unit_dropdown.options = await get_unit_options(mag)
+        unit_dropdown.value = "none"
+        pool[var_name]["unit"] = "none"
+        on_change()
+        try:
+            unit_dropdown.update()
+        except RuntimeError:
+            pass
+
+    mag_dropdown = dropdown(
+        label=tm.translate("Magnitud"),
+        options=[ft.DropdownOption("none")]
+        + [ft.DropdownOption(m) for m in default_units],
+        value=entry.get("magnitude", "none"),
+        on_change=_on_mag_change,
+    )
+
+    page.show_dialog(
+        modal(
+            title_str=tm.translate("Configuración de Variable"),
+            content=[
+                ft.Text(
+                    f"{tm.translate('Variable')}: {var_name}", weight=ft.FontWeight.BOLD
+                ),
+                desc_field,
+                mag_dropdown,
+                unit_dropdown,
+            ],
+            actions=[
+                filled_btn(
+                    tm.translate("Cerrar"), on_click=lambda _: page.pop_dialog()
+                ),
             ],
         )
     )
