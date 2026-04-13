@@ -5,6 +5,7 @@ from flet_base.components.modals import modal
 from flet_base.components.buttons import filled_btn
 from flet_base.components.inputs import dropdown
 from screens.editor.components.latex_dropdown import latex_dropdown
+from screens.editor.modals.modals import open_variable_settings_modal
 
 from screens.editor.utils.utils import load_default_units
 
@@ -302,23 +303,22 @@ class EditableColumn(ft.Container):
         page = self.page
         if not page:
             return
-        page.show_dialog(
-            modal(
-                title_str=tm.translate("Configuración de Columna"),
-                content=[
-                    ft.Text(
-                        f"{tm.translate('Variable')}: {self.current_name}",
-                        weight=ft.FontWeight.BOLD,
-                    ),
-                    self.description_field,
-                    self.mag_dropdown,
-                    self.unit_dropdown,
-                ],
-                actions=[
-                    filled_btn(tm.translate("Cerrar"), on_click=lambda _: page.pop_dialog()),
-                ],
+
+        import asyncio
+        if asyncio.iscoroutinefunction(open_variable_settings_modal):
+            asyncio.create_task(open_variable_settings_modal(
+                page,
+                self.current_name,
+                self.pool,
+                self._notify_change
+            ))
+        else:
+            open_variable_settings_modal(
+                page,
+                self.current_name,
+                self.pool,
+                self._notify_change
             )
-        )
 
     # ------------------------------------------------------------------ #
     #  Internal utils                                                      #
