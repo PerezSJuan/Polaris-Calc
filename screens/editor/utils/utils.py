@@ -5,7 +5,7 @@ from pathlib import Path
 def load_default_units() -> dict:
     """Load default_units from utils/math utils/unit conversor/default_units.py."""
     units_path = (
-        Path(__file__).parents[2] / "utils" / "math utils" / "unit conversor" / "default_units.py"
+        Path(__file__).parents[3] / "utils" / "math utils" / "unit conversor" / "default_units.py"
     )
     if not units_path.exists():
         return {}

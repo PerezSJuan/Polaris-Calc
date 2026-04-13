@@ -14,6 +14,28 @@ def latex_dropdown(label, options, value=None, on_change=None, width=200):
     return LatexDropdown(label, options, value=value, on_change=on_change, width=width)
 
 
+def get_latex_widget(val, size=14):
+    """Utility to get a markdown widget with LaTeX formatting."""
+    if not val:
+        return txt.body("-")
+
+    # Lógica de detección simple
+    if "^" in val or "_" in val or "\\" in val:
+        latex_str = f"$${val}$$"
+    else:
+        latex_str = f"$$\\text{{{val}}}$$"
+
+    return txt.markdown(latex_str, size=size)
+
+
+def latex_dropdown(label, options, value=None, on_change=None, width=200):
+    """
+    Componente Dropdown funcional que renderiza las opciones en formato LaTeX.
+    Sigue el patrón de diseño de flet_base.
+    """
+    return LatexDropdown(label, options, value=value, on_change=on_change, width=width)
+
+
 class LatexDropdown(ft.Column):
     """
     Componente de columna que envuelve un PopupMenuButton para simular un
@@ -23,21 +45,23 @@ class LatexDropdown(ft.Column):
     def __init__(self, label, options, value=None, on_change=None, width=200):
         super().__init__()
         self.label = label
-        self.options = options  # Lista de strings (formato LaTeX esperado ej: "x_1")
-        self.selected_value = value if value is not None else (options[0] if options else None)
+        self._options = options  # Lista de strings
+        self.selected_value = (
+            value if value is not None else (options[0] if options else None)
+        )
         self.on_change = on_change
         self._width = width
         self.spacing = 2
         self.tight = True
 
-        # Widgets internos que necesitamos actualizar
+        # Widgets internos
         self.label_text = ft.Text(
             self.label,
             size=10,
             color=themes.actual_theme["primary"],
             visible=not self.selected_value,
         )
-        self.latex_display = self._get_latex_widget(self.selected_value)
+        self.latex_display = get_latex_widget(self.selected_value)
 
         # El área visible que muestra la selección actual
         self.display_container = ft.Container(
@@ -71,7 +95,7 @@ class LatexDropdown(ft.Column):
             on_hover=self._on_hover,
         )
 
-        # El botón de menú desplegable que contiene al display_container
+        # El botón de menú desplegable
         self.menu_button = ft.PopupMenuButton(
             content=self.display_container,
             items=[],
@@ -86,26 +110,14 @@ class LatexDropdown(ft.Column):
         )
         e.control.update()
 
-    def _get_latex_widget(self, val):
-        if not val:
-            return txt.body("-")
-
-        # Lógica de detección simple similar a column.py
-        if "^" in val or "_" in val or "\\" in val:
-            latex_str = f"$${val}$$"
-        else:
-            latex_str = f"$$\\text{{{val}}}$$"
-
-        return txt.markdown(latex_str, size=14)
-
     def _build_menu(self):
         items = []
-        for opt in self.options:
+        for opt in self._options:
             is_selected = opt == self.selected_value
             items.append(
                 ft.PopupMenuItem(
                     content=ft.Container(
-                        content=self._get_latex_widget(opt),
+                        content=get_latex_widget(opt),
                         padding=ft.Padding(10, 5, 10, 5),
                         bgcolor=ft.Colors.with_opacity(
                             0.1, themes.actual_theme["primary"]
@@ -133,12 +145,12 @@ class LatexDropdown(ft.Column):
 
     def _sync_ui(self):
         """Sincroniza el estado interno con los widgets visuales."""
-        self.label_text.visible = not self.selected_value
+        self.label_text.visible = not bool(self.selected_value)
         # Reemplazamos el widget de LaTeX
-        self.display_container.content.controls[0].controls[1] = self._get_latex_widget(
+        self.display_container.content.controls[0].controls[1] = get_latex_widget(
             self.selected_value
         )
-        # Ajustamos el alineamiento si hay o no valor
+        # Ajustamos el alineamiento
         self.display_container.content.controls[0].alignment = (
             ft.MainAxisAlignment.CENTER
             if self.selected_value
@@ -158,6 +170,19 @@ class LatexDropdown(ft.Column):
     def value(self, new_val):
         self.selected_value = new_val
         self._sync_ui()
+
+    @property
+    def options(self):
+        return self._options
+
+    @options.setter
+    def options(self, new_opts):
+        self._options = new_opts
+        self._build_menu()
+        try:
+            self.update()
+        except Exception:
+            pass
 
 
 # ------------------------------------------------------------------ #

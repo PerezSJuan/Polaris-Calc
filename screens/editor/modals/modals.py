@@ -3,6 +3,7 @@ from flet_base.translations import instance_translation_manager as tm
 from flet_base.components.inputs import dropdown, text_input
 from flet_base.components.modals import modal
 from flet_base.components.buttons import filled_btn, text_btn
+from screens.editor.components.latex_dropdown import get_latex_widget
 
 from screens.editor.components.column import EditableColumn
 from screens.editor.utils.utils import load_default_units
@@ -203,8 +204,12 @@ async def open_variable_settings_modal(
         modal(
             title_str=tm.translate("Configuración de Variable"),
             content=[
-                ft.Text(
-                    f"{tm.translate('Variable')}: {var_name}", weight=ft.FontWeight.BOLD
+                ft.Row(
+                    [
+                        ft.Text(f"{tm.translate('Variable')}:", weight=ft.FontWeight.BOLD),
+                        get_latex_widget(var_name, size=14),
+                    ],
+                    spacing=5,
                 ),
                 desc_field,
                 mag_dropdown,

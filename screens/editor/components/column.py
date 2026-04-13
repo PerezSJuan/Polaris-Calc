@@ -4,6 +4,7 @@ import flet_base.components.texts as txt
 from flet_base.components.modals import modal
 from flet_base.components.buttons import filled_btn
 from flet_base.components.inputs import dropdown
+from screens.editor.components.latex_dropdown import latex_dropdown
 
 from screens.editor.utils.utils import load_default_units
 
@@ -47,11 +48,12 @@ class EditableColumn(ft.Container):
 
     def _build_ui(self):
         self.header_display = txt.markdown(self._get_latex_header(), size=14)
-        self.var_dropdown = dropdown(
+        self.var_dropdown = latex_dropdown(
             label=tm.translate("Variable"),
-            options=self._get_var_options(),
+            options=self.available_vars_getter(),
             value=self.current_name,
             on_change=self._on_var_switch,
+            width=150,
         )
 
         mag_options = [ft.DropdownOption("none")] + [
@@ -134,13 +136,15 @@ class EditableColumn(ft.Container):
         unit = self._entry.get("unit", "none")
         display = mag if mag != "none" else self.current_name
 
-        if "^" in display or "_" in display:
-            header = f"$${display}"
+        if "^" in display or "_" in display or "\\" in display:
+            latex_name = display
         else:
-            header = f"$$\\text{{{display}}}"
+            latex_name = f"\\text{{{display}}}"
 
-        header += f" \\ (\\text{{{unit}}})$$" if unit != "none" else "$$"
-        return header
+        if unit != "none":
+            return f"$${latex_name} \\ (\\text{{{unit}}})$$"
+        else:
+            return f"$${latex_name}$$"
 
     def _get_unit_options(self, mag):
         base = [ft.DropdownOption("none")]
@@ -194,7 +198,7 @@ class EditableColumn(ft.Container):
     # ------------------------------------------------------------------ #
 
     def update_dropdown(self):
-        self.var_dropdown.options = self._get_var_options()
+        self.var_dropdown.options = self.available_vars_getter()
         self.var_dropdown.value = self.current_name
 
     def sync_with_pool(self):
@@ -262,13 +266,13 @@ class EditableColumn(ft.Container):
         self._just_changed = True
         self.on_change()
 
-    def _on_var_switch(self, e):
+    def _on_var_switch(self, e=None):
         self.sync_pool()
         self.current_name = self.var_dropdown.value
         self._load_rows()
         self._notify_change()
 
-    def _on_cell_change(self, e):
+    def _on_cell_change(self, e=None):
         self.sync_pool()
         self._notify_change()
 
@@ -277,7 +281,7 @@ class EditableColumn(ft.Container):
         self.sync_pool()
         self._notify_change()
 
-    def _on_mag_change(self, e):
+    def _on_mag_change(self, e=None):
         self.pool[self.current_name]["magnitude"] = self.mag_dropdown.value
         self.unit_dropdown.options = self._get_unit_options(self.mag_dropdown.value)
         self.unit_dropdown.value = "none"
@@ -285,12 +289,12 @@ class EditableColumn(ft.Container):
         self._update_header()
         self._notify_change()
 
-    def _on_unit_change(self, e):
+    def _on_unit_change(self, e=None):
         self.pool[self.current_name]["unit"] = self.unit_dropdown.value
         self._update_header()
         self._notify_change()
 
-    def _on_description_change(self, e):
+    def _on_description_change(self, e=None):
         self.pool[self.current_name]["description"] = self.description_field.value
         self._notify_change()
 

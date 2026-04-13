@@ -3,6 +3,7 @@ from flet_base.translations import instance_translation_manager as tm
 from flet_base.components.texts import body, subtitle
 from flet_base.components.buttons import icon_btn
 from functools import partial
+from screens.editor.components.latex_dropdown import get_latex_widget
 
 
 def SummaryView(pool, themes, on_open_settings=None):
@@ -46,7 +47,7 @@ def SummaryView(pool, themes, on_open_settings=None):
                     ft.Row(
                         [
                             num_badge,
-                            body(name, size=18),
+                            get_latex_widget(name, size=18),
                             icon_btn(
                                 ft.Icons.SETTINGS,
                                 icon_size=18,
