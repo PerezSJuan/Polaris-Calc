@@ -49,6 +49,17 @@ class EditableColumn(ft.Container):
 
     def _build_ui(self):
         self.header_display = txt.markdown(self._get_latex_header(), size=14)
+        self.formula_badge = ft.Container(
+            visible=False,
+            content=ft.Text(
+                "",
+                size=11,
+                color=ft.Colors.with_opacity(0.75, self.themes.actual_theme["on_surface"]),
+            ),
+            bgcolor=ft.Colors.with_opacity(0.07, self.themes.actual_theme["on_surface"]),
+            border_radius=6,
+            padding=ft.Padding(8, 2, 8, 2),
+        )
         self.var_dropdown = latex_dropdown(
             label=tm.translate("Variable"),
             options=self.available_vars_getter(),
@@ -112,6 +123,7 @@ class EditableColumn(ft.Container):
                     ],
                     alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                 ),
+                self.formula_badge,
                 self.var_dropdown,
                 ft.Divider(
                     height=10,
@@ -131,6 +143,10 @@ class EditableColumn(ft.Container):
     @property
     def _entry(self):
         return self.pool.get(self.current_name, {})
+
+    def _is_derived(self) -> bool:
+        formula = self._entry.get("formula", "")
+        return isinstance(formula, str) and formula.strip() != ""
 
     def _get_latex_header(self):
         mag = self._entry.get("magnitude", "none")
@@ -156,6 +172,14 @@ class EditableColumn(ft.Container):
     def _get_var_options(self):
         return [ft.DropdownOption(name) for name in self.available_vars_getter()]
 
+    def _cell_bg_color(self):
+        opacity = 0.02 if self._is_derived() else 0.05
+        return ft.Colors.with_opacity(opacity, self.themes.actual_theme["on_surface"])
+
+    def _cell_text_color(self):
+        opacity = 0.7 if self._is_derived() else 1.0
+        return ft.Colors.with_opacity(opacity, self.themes.actual_theme["on_surface"])
+
     def _make_cell(self, value=""):
         return ft.TextField(
             value=str(value),
@@ -163,12 +187,47 @@ class EditableColumn(ft.Container):
             height=35,
             text_align=ft.TextAlign.RIGHT,
             on_change=self._on_cell_change,
+            read_only=self._is_derived(),
             border=ft.InputBorder.NONE,
-            bgcolor=ft.Colors.with_opacity(0.05, self.themes.actual_theme["on_surface"]),
+            bgcolor=self._cell_bg_color(),
+            color=self._cell_text_color(),
             border_radius=6,
             text_size=13,
             content_padding=ft.Padding.symmetric(horizontal=10),
         )
+
+    def _update_formula_badge(self):
+        formula = self._entry.get("formula", "")
+        has_formula = self._is_derived()
+        self.formula_badge.visible = has_formula
+        self.formula_badge.content.value = f"ƒ {formula}" if has_formula else ""
+        try:
+            self.formula_badge.update()
+        except RuntimeError:
+            pass
+
+    def _apply_rows_mode(self):
+        for cell in self.rows_col.controls:
+            if not isinstance(cell, ft.TextField):
+                continue
+            cell.read_only = self._is_derived()
+            cell.bgcolor = self._cell_bg_color()
+            cell.color = self._cell_text_color()
+
+    def _apply_derived_controls_state(self):
+        if not hasattr(self, "add_row_btn"):
+            return
+        is_derived = self._is_derived()
+        self.add_row_btn.disabled = is_derived
+        self.add_row_btn.icon_color = (
+            ft.Colors.with_opacity(0.35, self.themes.actual_theme["primary"])
+            if is_derived
+            else self.themes.actual_theme["primary"]
+        )
+        try:
+            self.add_row_btn.update()
+        except RuntimeError:
+            pass
 
     # ------------------------------------------------------------------ #
     #  Row management                                                      #
@@ -186,6 +245,9 @@ class EditableColumn(ft.Container):
         self.unit_dropdown.value = entry.get("unit", "none")
         self.description_field.value = entry.get("description", "")
         self._update_header()
+        self._update_formula_badge()
+        self._apply_rows_mode()
+        self._apply_derived_controls_state()
 
     def _update_header(self):
         self.header_display.value = self._get_latex_header()
@@ -220,6 +282,7 @@ class EditableColumn(ft.Container):
                 new = str(val)
                 if cell.value != new:
                     cell.value = new
+        self._apply_rows_mode()
 
         self._refresh_unit_dropdowns()
 
@@ -239,14 +302,20 @@ class EditableColumn(ft.Container):
     def sync_pool(self):
         """Write current TextField values back to the pool."""
         entry = self._entry
-        self.pool[self.current_name] = {
-            "values": [
+        values = (
+            entry.get("values", [])
+            if self._is_derived()
+            else [
                 self._parse_cell(c) for c in self.rows_col.controls
                 if isinstance(c, ft.TextField)
-            ],
+            ]
+        )
+        self.pool[self.current_name] = {
+            "values": values,
             "magnitude": entry.get("magnitude", "none"),
             "unit": entry.get("unit", "none"),
             "description": self.description_field.value,
+            "formula": entry.get("formula", ""),
         }
 
     def get_export_data(self):
@@ -257,6 +326,7 @@ class EditableColumn(ft.Container):
             "magnitude": entry.get("magnitude", "none"),
             "unit": entry.get("unit", "none"),
             "description": entry.get("description", ""),
+            "formula": entry.get("formula", ""),
         }
 
     # ------------------------------------------------------------------ #
@@ -274,10 +344,14 @@ class EditableColumn(ft.Container):
         self._notify_change()
 
     def _on_cell_change(self, e=None):
+        if self._is_derived():
+            return
         self.sync_pool()
         self._notify_change()
 
     def _add_row(self, e):
+        if self._is_derived():
+            return
         self.rows_col.controls.append(self._make_cell())
         self.sync_pool()
         self._notify_change()

@@ -3,7 +3,7 @@ import os
 
 
 def _normalize_columns(raw_data):
-    """Return columns in canonical format: [{name, values, magnitude, unit}]."""
+    """Return columns in canonical format: [{name, values, magnitude, unit, description, formula}]."""
     if isinstance(raw_data, dict):
         raw_columns = raw_data.get("columns", [])
     elif isinstance(raw_data, list):
@@ -20,8 +20,17 @@ def _normalize_columns(raw_data):
                 values = col.get("data") if isinstance(col.get("data"), list) else []
             magnitude = col.get("magnitude", "none")
             unit = col.get("unit", "none")
+            description = col.get("description", "")
+            formula = col.get("formula", "")
         elif isinstance(col, list):
-            name, values, magnitude, unit = f"V{i + 1}", col, "none", "none"
+            name, values, magnitude, unit, description, formula = (
+                f"V{i + 1}",
+                col,
+                "none",
+                "none",
+                "",
+                "",
+            )
         else:
             continue
 
@@ -30,9 +39,18 @@ def _normalize_columns(raw_data):
             "values": values,
             "magnitude": magnitude,
             "unit": unit,
+            "description": description,
+            "formula": formula,
         })
 
-    return columns or [{"name": "V1", "values": [], "magnitude": "none", "unit": "none"}]
+    return columns or [{
+        "name": "V1",
+        "values": [],
+        "magnitude": "none",
+        "unit": "none",
+        "description": "",
+        "formula": "",
+    }]
 
 
 def _normalize_layout(layout, columns_data):

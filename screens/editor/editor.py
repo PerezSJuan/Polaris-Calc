@@ -1,9 +1,19 @@
+import os
+import sys
 import uuid
 import flet as ft
 import flet_base.router as fr
 from flet_base.translations import instance_translation_manager as tm
 
 from flet_base.components.buttons import icon_btn
+current_dir = os.path.dirname(os.path.abspath(__file__))
+math_utils_path = os.path.abspath(
+    os.path.join(current_dir, "..", "..", "utils", "math utils")
+)
+if math_utils_path not in sys.path:
+    sys.path.append(math_utils_path)
+
+from function_substitution import CONSTANTS, evaluate, parse_expression
 
 from screens.editor.utils.utils import normalize_editor_data
 from screens.editor.components.column import EditableColumn
@@ -30,6 +40,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
             "magnitude": col["magnitude"],
             "unit": col["unit"],
             "description": col.get("description", ""),
+            "formula": col.get("formula", ""),
         }
         for col in normalized["columns"]
     }
@@ -72,6 +83,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
         vertical_alignment=ft.CrossAxisAlignment.START,
         spacing=20,
     )
+    formula_error_state = {"message": None}
 
     # ------------------------------------------------------------------
     # Helpers
@@ -91,6 +103,142 @@ async def EditorScreen(data: fr.DataSystem, themes):
 
     def _current_tab() -> dict:
         return tabs[active_index[0]]
+    def _normalize_unit_for_eval(unit: str) -> str:
+        return "1" if unit in ("none", "", None) else unit
+
+    def _normalize_unit_for_pool(unit: str) -> str:
+        return "none" if unit in ("1", "", None) else unit
+
+    def _is_derived(name: str) -> bool:
+        formula = pool.get(name, {}).get("formula", "")
+        return isinstance(formula, str) and formula.strip() != ""
+
+    def _show_formula_error(message):
+        if formula_error_state["message"] == message:
+            return
+        formula_error_state["message"] = message
+        if not message:
+            return
+        data.page.snack_bar = ft.SnackBar(ft.Text(message))
+        data.page.snack_bar.open = True
+        _try_update(data.page)
+
+    def _as_float(value) -> float:
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return 0.0
+
+    def _extract_dependencies(variable_name: str, formula: str) -> list[str]:
+        expr = parse_expression(formula, mode="auto")
+        symbols = {str(sym) for sym in expr.free_symbols}
+        unknown = sorted(
+            symbol for symbol in symbols if symbol not in pool and symbol not in CONSTANTS
+        )
+        if unknown:
+            raise ValueError(
+                f"{variable_name}: símbolos no definidos ({', '.join(unknown)})"
+            )
+        return sorted(symbol for symbol in symbols if symbol in pool)
+
+    def _evaluate_formula_vector(variable_name: str, formula: str, deps: list[str]):
+        dep_lengths = {}
+        for dep in deps:
+            dep_values = pool.get(dep, {}).get("values", [])
+            dep_lengths[dep] = len(dep_values) if isinstance(dep_values, list) else 0
+
+        non_scalar_lengths = {length for length in dep_lengths.values() if length != 1}
+        if len(non_scalar_lengths) > 1:
+            length_info = ", ".join(f"{name}={dep_lengths[name]}" for name in deps)
+            raise ValueError(
+                f"{variable_name}: longitudes incompatibles ({length_info}). "
+                "Solo se permite broadcast de escalares (len=1)."
+            )
+
+        target_len = non_scalar_lengths.pop() if non_scalar_lengths else 1
+        if any(length not in (1, target_len) for length in dep_lengths.values()):
+            length_info = ", ".join(f"{name}={dep_lengths[name]}" for name in deps)
+            raise ValueError(
+                f"{variable_name}: longitudes incompatibles ({length_info}). "
+                "Solo se permite broadcast de escalares (len=1)."
+            )
+
+        result_values = []
+        result_unit = "none"
+
+        for idx in range(target_len):
+            variables = {}
+            for dep in deps:
+                dep_entry = pool.get(dep, {})
+                dep_values = dep_entry.get("values", [])
+                if len(dep_values) == 1:
+                    dep_value = dep_values[0]
+                else:
+                    dep_value = dep_values[idx]
+                variables[dep] = (
+                    _as_float(dep_value),
+                    _normalize_unit_for_eval(dep_entry.get("unit", "none")),
+                )
+
+            value, unit = evaluate(formula, variables, mode="auto")
+            result_values.append(float(value))
+            result_unit = _normalize_unit_for_pool(unit)
+
+        return result_values, result_unit
+
+    def recalculate_derived_variables(show_errors=True) -> bool:
+        derived_names = [name for name in pool if _is_derived(name)]
+        if not derived_names:
+            if show_errors:
+                _show_formula_error(None)
+            return True
+
+        try:
+            dependencies = {}
+            for name in derived_names:
+                formula = pool[name].get("formula", "").strip()
+                dependencies[name] = _extract_dependencies(name, formula)
+
+            derived_set = set(derived_names)
+            graph = {name: set() for name in derived_names}
+            indegree = {name: 0 for name in derived_names}
+
+            for name, deps in dependencies.items():
+                for dep in deps:
+                    if dep in derived_set:
+                        graph[dep].add(name)
+                        indegree[name] += 1
+
+            queue = [name for name in derived_names if indegree[name] == 0]
+            ordered = []
+            while queue:
+                current = queue.pop(0)
+                ordered.append(current)
+                for nxt in graph[current]:
+                    indegree[nxt] -= 1
+                    if indegree[nxt] == 0:
+                        queue.append(nxt)
+
+            if len(ordered) != len(derived_names):
+                cyclic = [name for name in derived_names if indegree[name] > 0]
+                raise ValueError(
+                    "Dependencia cíclica entre derivadas: " + ", ".join(sorted(cyclic))
+                )
+
+            for name in ordered:
+                formula = pool[name].get("formula", "").strip()
+                values, unit = _evaluate_formula_vector(name, formula, dependencies[name])
+                pool[name]["values"] = values
+                pool[name]["unit"] = unit
+                pool[name]["magnitude"] = "none"
+
+            if show_errors:
+                _show_formula_error(None)
+            return True
+        except Exception as exc:
+            if show_errors:
+                _show_formula_error(f"Error en variable derivada: {exc}")
+            return False
 
     def _make_column(name: str) -> EditableColumn:
         return EditableColumn(
@@ -122,6 +270,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
 
     def on_column_data_changed():
         _current_tab()["columns"] = [col.current_name for col in _visible_columns()]
+        recalculate_derived_variables(show_errors=True)
         update_shared_state()
         for col in _visible_columns():
             col.sync_with_pool()
@@ -235,7 +384,16 @@ async def EditorScreen(data: fr.DataSystem, themes):
 
         if target is None:
             target = get_available_vars()[0] if pool else "V1"
-            pool.setdefault(target, {"values": [], "magnitude": "none", "unit": "none"})
+            pool.setdefault(
+                target,
+                {
+                    "values": [],
+                    "magnitude": "none",
+                    "unit": "none",
+                    "description": "",
+                    "formula": "",
+                },
+            )
 
         controls = columns_row.controls
         new_col = _make_column(target)
@@ -280,6 +438,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
     # ------------------------------------------------------------------
     # Initial render
     # ------------------------------------------------------------------
+    recalculate_derived_variables(show_errors=False)
     _refresh_ui()
 
     return ft.View(

@@ -169,6 +169,14 @@ async def open_create_column_modal(
     desc_field = text_input(
         placeholder=tm.translate("Descripcion (opcional)"), multiline=True, max_lines=3
     )
+    derived_switch = ft.Switch(
+        label=tm.translate("Variable derivada"),
+        value=False,
+    )
+    formula_field = text_input(
+        placeholder=tm.translate("Formula (ej: A * B + C)"),
+    )
+    formula_field.visible = False
 
     mag_dropdown = dropdown(
         label=tm.translate("Magnitud"),
@@ -193,8 +201,26 @@ async def open_create_column_modal(
             and mag != "none"
             and default_units.get(mag, {}).get(unit, {}).get("use_prefixes", False)
         )
+    def _set_unit_controls_enabled(enabled: bool):
+        mag_dropdown.disabled = not enabled
+        unit_dropdown.disabled = not enabled
+        if not enabled:
+            mag_dropdown.value = "none"
+            unit_dropdown.options = [ft.DropdownOption("none")]
+            unit_dropdown.value = "none"
+            prefix_dropdown.value = _NONE_LATEX
+        _set_prefix_enabled(prefix_dropdown, enabled and _supports_prefix())
+        for ctrl in (mag_dropdown, unit_dropdown):
+            try:
+                ctrl.update()
+            except RuntimeError:
+                pass
 
     def _refresh_prefix_state():
+        if derived_switch.value:
+            prefix_dropdown.value = _NONE_LATEX
+            _set_prefix_enabled(prefix_dropdown, False)
+            return
         supports = _supports_prefix()
         if not supports:
             prefix_dropdown.value = _NONE_LATEX
@@ -217,6 +243,18 @@ async def open_create_column_modal(
 
     mag_dropdown.on_change = on_mag_change
     unit_dropdown.on_change = on_unit_change
+    def on_derived_toggle(e):
+        is_derived = bool(derived_switch.value)
+        formula_field.visible = is_derived
+        if not is_derived:
+            formula_field.value = ""
+        _set_unit_controls_enabled(not is_derived)
+        try:
+            formula_field.update()
+        except RuntimeError:
+            pass
+
+    derived_switch.on_change = on_derived_toggle
 
     def _apply_parsed_unit(unit_str: str):
         resolved = _resolve_unit(unit_str)
@@ -242,7 +280,8 @@ async def open_create_column_modal(
         raw = name_field.value or ""
         var_name, unit_str = _parse_name_unit(raw)
         if unit_str:
-            _apply_parsed_unit(unit_str)
+            if not derived_switch.value:
+                _apply_parsed_unit(unit_str)
             name_field.value = var_name
             try:
                 name_field.update()
@@ -254,10 +293,18 @@ async def open_create_column_modal(
     def save_new_column(e):
         raw_name = name_field.value.strip()
         var_name, unit_str = _parse_name_unit(raw_name)
+        is_derived = bool(derived_switch.value)
+        formula = (formula_field.value or "").strip()
 
-        if unit_str:
+        if unit_str and not is_derived:
             # Enforce unit settings if found in name even if blur didn't fire
             _apply_parsed_unit(unit_str)
+            name_field.value = var_name
+            try:
+                name_field.update()
+            except RuntimeError:
+                pass
+        elif unit_str and is_derived:
             name_field.value = var_name
             try:
                 name_field.update()
@@ -266,12 +313,15 @@ async def open_create_column_modal(
 
         if not var_name or var_name in pool:
             return
+        if is_derived and not formula:
+            return
 
         pool[var_name] = {
             "values": [],
-            "magnitude": mag_dropdown.value,
-            "unit": _full_unit(prefix_dropdown, unit_dropdown),
+            "magnitude": "none" if is_derived else mag_dropdown.value,
+            "unit": "none" if is_derived else _full_unit(prefix_dropdown, unit_dropdown),
             "description": desc_field.value.strip(),
+            "formula": formula if is_derived else "",
         }
 
         from screens.editor.components.column import EditableColumn
@@ -290,7 +340,7 @@ async def open_create_column_modal(
             controls.append(new_col)
 
         refresh_all_dropdowns()
-        update_shared_state()
+        on_column_data_changed()
 
         try:
             columns_row.update()
@@ -313,6 +363,8 @@ async def open_create_column_modal(
             content=[
                 name_field,
                 desc_field,
+                derived_switch,
+                formula_field,
                 mag_dropdown,
                 ft.Row(
                     [prefix_dropdown, unit_dropdown],
@@ -363,6 +415,8 @@ async def open_variable_settings_modal(page, var_name, pool, on_change):
     Restores existing prefixed units correctly (e.g. 'km' -> k + m).
     """
     entry = pool.get(var_name, {})
+    formula = entry.get("formula", "")
+    is_derived = isinstance(formula, str) and formula.strip() != ""
 
     existing_unit = entry.get("unit", "none")
     resolved = (
@@ -398,10 +452,16 @@ async def open_variable_settings_modal(page, var_name, pool, on_change):
         return base + [ft.DropdownOption(u) for u in default_units[mag]]
 
     def _commit_unit():
+        if is_derived:
+            return
         pool[var_name]["unit"] = _full_unit(prefix_dropdown, unit_dropdown)
         on_change()
 
     def _refresh_prefix_state_s():
+        if is_derived:
+            prefix_dropdown.value = _NONE_LATEX
+            _set_prefix_enabled(prefix_dropdown, False)
+            return
         mag = mag_dropdown.value
         unit = unit_dropdown.value
         supports = (
@@ -422,6 +482,8 @@ async def open_variable_settings_modal(page, var_name, pool, on_change):
 
     # LatexDropdown calls on_change with the selected value string directly
     def _on_prefix_change(val):
+        if is_derived:
+            return
         _commit_unit()
 
     prefix_dropdown = _build_prefix_dd(
@@ -434,6 +496,8 @@ async def open_variable_settings_modal(page, var_name, pool, on_change):
     # ── unit dropdown ─────────────────────────────────────────────────────────
 
     def _on_unit_change(e):
+        if is_derived:
+            return
         _refresh_prefix_state_s()
 
     unit_dropdown = dropdown(
@@ -446,6 +510,8 @@ async def open_variable_settings_modal(page, var_name, pool, on_change):
     # ── magnitude dropdown ────────────────────────────────────────────────────
 
     async def _on_mag_change(e):
+        if is_derived:
+            return
         mag = mag_dropdown.value
         pool[var_name]["magnitude"] = mag
         unit_dropdown.options = await _unit_options(mag)
@@ -463,6 +529,22 @@ async def open_variable_settings_modal(page, var_name, pool, on_change):
         value=init_mag,
         on_change=_on_mag_change,
     )
+    mag_dropdown.disabled = is_derived
+    unit_dropdown.disabled = is_derived
+    if is_derived:
+        _set_prefix_enabled(prefix_dropdown, False)
+
+    formula_badge = ft.Container(
+        content=ft.Text(
+            f"ƒ {formula}",
+            size=12,
+            color=ft.Colors.ON_SURFACE,
+        ),
+        bgcolor=ft.Colors.with_opacity(0.07, ft.Colors.ON_SURFACE),
+        border_radius=8,
+        padding=ft.Padding(8, 4, 8, 4),
+        visible=is_derived,
+    )
 
     page.show_dialog(
         modal(
@@ -478,6 +560,7 @@ async def open_variable_settings_modal(page, var_name, pool, on_change):
                     ],
                     spacing=5,
                 ),
+                formula_badge,
                 desc_field,
                 mag_dropdown,
                 ft.Row(

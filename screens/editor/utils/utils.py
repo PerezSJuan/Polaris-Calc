@@ -23,7 +23,7 @@ def normalize_editor_data(raw_data) -> dict:
     """
     Normalize editor data into canonical form:
         {
-            "columns": [{name, values, magnitude, unit}, ...],
+            "columns": [{name, values, magnitude, unit, description, formula}, ...],
             "layout": {
                 "tabs": [{"name": str, "columns": [var_name, ...]}, ...],
                 "active_tab_index": int,
@@ -66,8 +66,16 @@ def _normalize_columns(raw) -> list[dict]:
             magnitude = col.get("magnitude", "none")
             unit = col.get("unit", "none")
             description = col.get("description", "")
+            formula = col.get("formula", "")
         elif isinstance(col, list):
-            name, values, magnitude, unit, description = f"V{i + 1}", col, "none", "none", ""
+            name, values, magnitude, unit, description, formula = (
+                f"V{i + 1}",
+                col,
+                "none",
+                "none",
+                "",
+                "",
+            )
         else:
             continue
         columns.append(
@@ -77,11 +85,19 @@ def _normalize_columns(raw) -> list[dict]:
                 "magnitude": magnitude,
                 "unit": unit,
                 "description": description,
+                "formula": formula,
             }
         )
 
     return columns or [
-        {"name": "V1", "values": [], "magnitude": "none", "unit": "none", "description": ""}
+        {
+            "name": "V1",
+            "values": [],
+            "magnitude": "none",
+            "unit": "none",
+            "description": "",
+            "formula": "",
+        }
     ]
 
 
