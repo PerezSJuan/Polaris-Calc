@@ -8,6 +8,13 @@ from screens.editor.components.latex_dropdown import (
     get_latex_widget,
     latex_dropdown as make_latex_dropdown,
 )
+from utils.variable_types import (
+    ALL_VARIABLE_TYPES,
+    VARIABLE_TYPE_COLUMN_NO_ERROR,
+    VARIABLE_TYPE_LABELS,
+    infer_variable_type,
+    is_formula_type,
+)
 
 
 from screens.editor.utils.utils import load_default_units
@@ -169,9 +176,16 @@ async def open_create_column_modal(
     desc_field = text_input(
         placeholder=tm.translate("Descripcion (opcional)"), multiline=True, max_lines=3
     )
-    derived_switch = ft.Switch(
-        label=tm.translate("Variable derivada"),
-        value=False,
+    type_dropdown = dropdown(
+        label=tm.translate("Tipo"),
+        options=[
+            ft.DropdownOption(
+                key=var_type,
+                text=tm.translate(VARIABLE_TYPE_LABELS.get(var_type, var_type)),
+            )
+            for var_type in ALL_VARIABLE_TYPES
+        ],
+        value=VARIABLE_TYPE_COLUMN_NO_ERROR,
     )
     formula_field = text_input(
         placeholder=tm.translate("Formula (ej: A * B + C)"),
@@ -192,6 +206,8 @@ async def open_create_column_modal(
         options=[ft.DropdownOption("none")],
         value="none",
     )
+    def _is_formula_selected():
+        return is_formula_type(type_dropdown.value)
 
     def _supports_prefix():
         mag = mag_dropdown.value
@@ -217,7 +233,7 @@ async def open_create_column_modal(
                 pass
 
     def _refresh_prefix_state():
-        if derived_switch.value:
+        if _is_formula_selected():
             prefix_dropdown.value = _NONE_LATEX
             _set_prefix_enabled(prefix_dropdown, False)
             return
@@ -243,18 +259,18 @@ async def open_create_column_modal(
 
     mag_dropdown.on_change = on_mag_change
     unit_dropdown.on_change = on_unit_change
-    def on_derived_toggle(e):
-        is_derived = bool(derived_switch.value)
-        formula_field.visible = is_derived
-        if not is_derived:
+
+    def on_type_change(e):
+        is_formula = _is_formula_selected()
+        formula_field.visible = is_formula
+        if not is_formula:
             formula_field.value = ""
-        _set_unit_controls_enabled(not is_derived)
+        _set_unit_controls_enabled(not is_formula)
         try:
             formula_field.update()
         except RuntimeError:
             pass
-
-    derived_switch.on_change = on_derived_toggle
+    type_dropdown.on_change = on_type_change
 
     def _apply_parsed_unit(unit_str: str):
         resolved = _resolve_unit(unit_str)
@@ -280,7 +296,7 @@ async def open_create_column_modal(
         raw = name_field.value or ""
         var_name, unit_str = _parse_name_unit(raw)
         if unit_str:
-            if not derived_switch.value:
+            if not _is_formula_selected():
                 _apply_parsed_unit(unit_str)
             name_field.value = var_name
             try:
@@ -293,7 +309,8 @@ async def open_create_column_modal(
     def save_new_column(e):
         raw_name = name_field.value.strip()
         var_name, unit_str = _parse_name_unit(raw_name)
-        is_derived = bool(derived_switch.value)
+        var_type = type_dropdown.value or VARIABLE_TYPE_COLUMN_NO_ERROR
+        is_derived = is_formula_type(var_type)
         formula = (formula_field.value or "").strip()
 
         if unit_str and not is_derived:
@@ -318,6 +335,8 @@ async def open_create_column_modal(
 
         pool[var_name] = {
             "values": [],
+            "errors": [],
+            "type": var_type,
             "magnitude": "none" if is_derived else mag_dropdown.value,
             "unit": "none" if is_derived else _full_unit(prefix_dropdown, unit_dropdown),
             "description": desc_field.value.strip(),
@@ -363,7 +382,7 @@ async def open_create_column_modal(
             content=[
                 name_field,
                 desc_field,
-                derived_switch,
+                type_dropdown,
                 formula_field,
                 mag_dropdown,
                 ft.Row(
@@ -415,8 +434,9 @@ async def open_variable_settings_modal(page, var_name, pool, on_change):
     Restores existing prefixed units correctly (e.g. 'km' -> k + m).
     """
     entry = pool.get(var_name, {})
+    var_type = infer_variable_type(entry)
     formula = entry.get("formula", "")
-    is_derived = isinstance(formula, str) and formula.strip() != ""
+    is_derived = is_formula_type(var_type) and isinstance(formula, str) and formula.strip() != ""
 
     existing_unit = entry.get("unit", "none")
     resolved = (

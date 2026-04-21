@@ -1,5 +1,6 @@
 import flet as ft
 from utils.file_utils import save_plc, load_plc
+from utils.variable_types import VARIABLE_TYPE_COLUMN_NO_ERROR
 
 
 def create_topbar(page: ft.Page, color_scheme, translation_manager, shared=None):
@@ -23,7 +24,12 @@ def create_topbar(page: ft.Page, color_scheme, translation_manager, shared=None)
 
     async def handle_new(e):
         if shared is not None:
-            shared["editor_data"] = [{"name": "V1", "values": []}]
+            shared["editor_data"] = [{
+                "name": "V1",
+                "values": [],
+                "errors": [],
+                "type": VARIABLE_TYPE_COLUMN_NO_ERROR,
+            }]
             shared["current_file_path"] = None
         if page.route == "/editor":
             page.go("/home")

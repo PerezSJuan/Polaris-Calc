@@ -1,5 +1,9 @@
 import importlib.util
 from pathlib import Path
+from utils.variable_types import (
+    VARIABLE_TYPE_COLUMN_NO_ERROR,
+    infer_variable_type,
+)
 
 
 def load_default_units() -> dict:
@@ -23,7 +27,7 @@ def normalize_editor_data(raw_data) -> dict:
     """
     Normalize editor data into canonical form:
         {
-            "columns": [{name, values, magnitude, unit, description, formula}, ...],
+            "columns": [{name, values, errors, type, magnitude, unit, description, formula}, ...],
             "layout": {
                 "tabs": [{"name": str, "columns": [var_name, ...]}, ...],
                 "active_tab_index": int,
@@ -63,14 +67,24 @@ def _normalize_columns(raw) -> list[dict]:
             values = col.get("values")
             if not isinstance(values, list):
                 values = col.get("data") if isinstance(col.get("data"), list) else []
+            errors = col.get("errors", [])
+            if isinstance(errors, list):
+                normalized_errors = errors
+            elif errors in ("", None):
+                normalized_errors = []
+            else:
+                normalized_errors = [errors]
             magnitude = col.get("magnitude", "none")
             unit = col.get("unit", "none")
             description = col.get("description", "")
             formula = col.get("formula", "")
+            var_type = infer_variable_type(col)
         elif isinstance(col, list):
-            name, values, magnitude, unit, description, formula = (
+            name, values, normalized_errors, var_type, magnitude, unit, description, formula = (
                 f"V{i + 1}",
                 col,
+                [],
+                VARIABLE_TYPE_COLUMN_NO_ERROR,
                 "none",
                 "none",
                 "",
@@ -82,6 +96,8 @@ def _normalize_columns(raw) -> list[dict]:
             {
                 "name": str(name),
                 "values": values,
+                "errors": normalized_errors,
+                "type": var_type,
                 "magnitude": magnitude,
                 "unit": unit,
                 "description": description,
@@ -93,6 +109,8 @@ def _normalize_columns(raw) -> list[dict]:
         {
             "name": "V1",
             "values": [],
+            "errors": [],
+            "type": VARIABLE_TYPE_COLUMN_NO_ERROR,
             "magnitude": "none",
             "unit": "none",
             "description": "",

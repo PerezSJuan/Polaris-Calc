@@ -17,6 +17,12 @@ from function_substitution import CONSTANTS, evaluate, parse_expression
 
 from screens.editor.utils.utils import normalize_editor_data
 from screens.editor.components.column import EditableColumn
+from utils.variable_types import (
+    VARIABLE_TYPE_COLUMN_NO_ERROR,
+    VARIABLE_TYPE_FORMULA_WITH_ERROR,
+    infer_variable_type,
+    is_formula_type,
+)
 from screens.editor.modals.modals import (
     open_create_column_modal,
     open_rename_tab_modal,
@@ -30,6 +36,12 @@ async def EditorScreen(data: fr.DataSystem, themes):
     """Main screen for managing and editing data vectors, with tab layout."""
 
     normalized = normalize_editor_data(data.shared.get("editor_data", []))
+    def _normalize_errors(raw_errors):
+        if isinstance(raw_errors, list):
+            return raw_errors
+        if raw_errors in ("", None):
+            return []
+        return [raw_errors]
 
     # ------------------------------------------------------------------
     # Global pool  {name: {values, magnitude, unit}}
@@ -41,6 +53,8 @@ async def EditorScreen(data: fr.DataSystem, themes):
             "unit": col["unit"],
             "description": col.get("description", ""),
             "formula": col.get("formula", ""),
+            "type": infer_variable_type(col),
+            "errors": _normalize_errors(col.get("errors", [])),
         }
         for col in normalized["columns"]
     }
@@ -110,8 +124,9 @@ async def EditorScreen(data: fr.DataSystem, themes):
         return "none" if unit in ("1", "", None) else unit
 
     def _is_derived(name: str) -> bool:
-        formula = pool.get(name, {}).get("formula", "")
-        return isinstance(formula, str) and formula.strip() != ""
+        entry = pool.get(name, {})
+        formula = entry.get("formula", "")
+        return is_formula_type(infer_variable_type(entry)) and isinstance(formula, str) and formula.strip() != ""
 
     def _show_formula_error(message):
         if formula_error_state["message"] == message:
@@ -142,6 +157,11 @@ async def EditorScreen(data: fr.DataSystem, themes):
         return sorted(symbol for symbol in symbols if symbol in pool)
 
     def _evaluate_formula_vector(variable_name: str, formula: str, deps: list[str]):
+        variable_type = infer_variable_type(pool.get(variable_name, {}))
+        if variable_type == VARIABLE_TYPE_FORMULA_WITH_ERROR:
+            raise NotImplementedError(
+                "El cálculo de errores para variables de fórmula aún no está implementado."
+            )
         dep_lengths = {}
         for dep in deps:
             dep_values = pool.get(dep, {}).get("values", [])
@@ -231,6 +251,8 @@ async def EditorScreen(data: fr.DataSystem, themes):
                 pool[name]["values"] = values
                 pool[name]["unit"] = unit
                 pool[name]["magnitude"] = "none"
+                if infer_variable_type(pool[name]) != VARIABLE_TYPE_FORMULA_WITH_ERROR:
+                    pool[name]["errors"] = []
 
             if show_errors:
                 _show_formula_error(None)
@@ -392,6 +414,8 @@ async def EditorScreen(data: fr.DataSystem, themes):
                     "unit": "none",
                     "description": "",
                     "formula": "",
+                    "type": VARIABLE_TYPE_COLUMN_NO_ERROR,
+                    "errors": [],
                 },
             )
 

@@ -1,13 +1,18 @@
 import flet as ft
 from flet_base.translations import instance_translation_manager as tm
 import flet_base.components.texts as txt
-from flet_base.components.modals import modal
-from flet_base.components.buttons import filled_btn
 from flet_base.components.inputs import dropdown
 from screens.editor.components.latex_dropdown import latex_dropdown
 from screens.editor.modals.modals import open_variable_settings_modal
 
 from screens.editor.utils.utils import load_default_units
+from utils.variable_types import (
+    has_error_per_value,
+    has_single_error,
+    infer_variable_type,
+    is_constant_type,
+    is_formula_type,
+)
 
 default_units = load_default_units()
 
@@ -86,6 +91,22 @@ class EditableColumn(ft.Container):
         )
 
         self.rows_col = ft.Column(spacing=8, scroll=ft.ScrollMode.ADAPTIVE)
+        self.global_error_field = ft.TextField(
+            label=tm.translate("Error"),
+            dense=True,
+            height=38,
+            text_align=ft.TextAlign.RIGHT,
+            on_change=self._on_global_error_change,
+            border=ft.InputBorder.NONE,
+            bgcolor=ft.Colors.with_opacity(0.05, self.themes.actual_theme["error"]),
+            border_radius=6,
+            text_size=13,
+            content_padding=ft.Padding.symmetric(horizontal=10),
+        )
+        self.global_error_container = ft.Container(
+            content=self.global_error_field,
+            visible=False,
+        )
         self._load_rows()
 
         self.add_row_btn = ft.IconButton(
@@ -130,7 +151,8 @@ class EditableColumn(ft.Container):
                     thickness=0.5,
                     color=ft.Colors.with_opacity(0.1, self.themes.actual_theme["on_surface"]),
                 ),
-                ft.Container(content=self.rows_col, height=320),
+                ft.Container(content=self.rows_col, height=274),
+                self.global_error_container,
                 ft.Row([self.add_row_btn], alignment=ft.MainAxisAlignment.CENTER),
             ],
             spacing=10,
@@ -144,9 +166,34 @@ class EditableColumn(ft.Container):
     def _entry(self):
         return self.pool.get(self.current_name, {})
 
+    def _var_type(self) -> str:
+        return infer_variable_type(self._entry)
+
     def _is_derived(self) -> bool:
         formula = self._entry.get("formula", "")
-        return isinstance(formula, str) and formula.strip() != ""
+        return (
+            is_formula_type(self._var_type())
+            and isinstance(formula, str)
+            and formula.strip() != ""
+        )
+
+    def _supports_single_error(self) -> bool:
+        return has_single_error(self._var_type()) and not self._is_derived()
+
+    def _supports_per_value_error(self) -> bool:
+        return has_error_per_value(self._var_type()) and not self._is_derived()
+
+    def _entry_values(self) -> list:
+        values = self._entry.get("values", [])
+        return values if isinstance(values, list) else []
+
+    def _entry_errors(self) -> list:
+        errors = self._entry.get("errors", [])
+        if isinstance(errors, list):
+            return errors
+        if errors in ("", None):
+            return []
+        return [errors]
 
     def _get_latex_header(self):
         mag = self._entry.get("magnitude", "none")
@@ -169,9 +216,6 @@ class EditableColumn(ft.Container):
             return base
         return base + [ft.DropdownOption(u) for u in default_units[mag]]
 
-    def _get_var_options(self):
-        return [ft.DropdownOption(name) for name in self.available_vars_getter()]
-
     def _cell_bg_color(self):
         opacity = 0.02 if self._is_derived() else 0.05
         return ft.Colors.with_opacity(opacity, self.themes.actual_theme["on_surface"])
@@ -180,10 +224,11 @@ class EditableColumn(ft.Container):
         opacity = 0.7 if self._is_derived() else 1.0
         return ft.Colors.with_opacity(opacity, self.themes.actual_theme["on_surface"])
 
-    def _make_cell(self, value=""):
+    def _make_value_cell(self, value="", compact=False):
         return ft.TextField(
             value=str(value),
             dense=True,
+            width=88 if compact else None,
             height=35,
             text_align=ft.TextAlign.RIGHT,
             on_change=self._on_cell_change,
@@ -196,6 +241,53 @@ class EditableColumn(ft.Container):
             content_padding=ft.Padding.symmetric(horizontal=10),
         )
 
+    def _make_error_cell(self, value=""):
+        return ft.TextField(
+            value=str(value),
+            dense=True,
+            width=58,
+            height=35,
+            text_align=ft.TextAlign.RIGHT,
+            on_change=self._on_cell_change,
+            read_only=self._is_derived(),
+            border=ft.InputBorder.NONE,
+            bgcolor=ft.Colors.with_opacity(0.04, self.themes.actual_theme["error"]),
+            color=self._cell_text_color(),
+            border_radius=6,
+            text_size=13,
+            content_padding=ft.Padding.symmetric(horizontal=8),
+            tooltip=tm.translate("Error"),
+        )
+
+    def _make_row(self, value="", error=""):
+        if self._supports_per_value_error():
+            return ft.Row(
+                [
+                    self._make_value_cell(value=value, compact=True),
+                    self._make_error_cell(error),
+                ],
+                spacing=6,
+                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+            )
+        return self._make_value_cell(value=value)
+
+    @staticmethod
+    def _extract_row_cells(row):
+        if isinstance(row, ft.TextField):
+            return row, None
+        if isinstance(row, ft.Row):
+            value_cell = row.controls[0] if len(row.controls) > 0 else None
+            error_cell = row.controls[1] if len(row.controls) > 1 else None
+            if isinstance(value_cell, ft.TextField) and isinstance(error_cell, ft.TextField):
+                return value_cell, error_cell
+        return None, None
+
+    def _row_matches_mode(self, row) -> bool:
+        value_cell, error_cell = self._extract_row_cells(row)
+        if self._supports_per_value_error():
+            return value_cell is not None and error_cell is not None
+        return isinstance(row, ft.TextField)
+
     def _update_formula_badge(self):
         formula = self._entry.get("formula", "")
         has_formula = self._is_derived()
@@ -206,22 +298,39 @@ class EditableColumn(ft.Container):
         except RuntimeError:
             pass
 
+    def _sync_global_error_field(self, errors: list):
+        show_single_error = self._supports_single_error()
+        self.global_error_container.visible = show_single_error
+        if not show_single_error:
+            self.global_error_field.value = ""
+            return
+
+        error_value = errors[0] if errors else ""
+        new_value = str(error_value) if error_value != "" else ""
+        if not getattr(self.global_error_field, "focused", False):
+            self.global_error_field.value = new_value
+        self.global_error_field.read_only = self._is_derived()
+        self.global_error_field.bgcolor = self._cell_bg_color()
+        self.global_error_field.color = self._cell_text_color()
+
     def _apply_rows_mode(self):
-        for cell in self.rows_col.controls:
-            if not isinstance(cell, ft.TextField):
-                continue
-            cell.read_only = self._is_derived()
-            cell.bgcolor = self._cell_bg_color()
-            cell.color = self._cell_text_color()
+        for row in self.rows_col.controls:
+            value_cell, error_cell = self._extract_row_cells(row)
+            for cell in (value_cell, error_cell):
+                if cell is None:
+                    continue
+                cell.read_only = self._is_derived()
+                cell.bgcolor = self._cell_bg_color()
+                cell.color = self._cell_text_color()
 
     def _apply_derived_controls_state(self):
         if not hasattr(self, "add_row_btn"):
             return
-        is_derived = self._is_derived()
-        self.add_row_btn.disabled = is_derived
+        block_add_rows = self._is_derived() or is_constant_type(self._var_type())
+        self.add_row_btn.disabled = block_add_rows
         self.add_row_btn.icon_color = (
             ft.Colors.with_opacity(0.35, self.themes.actual_theme["primary"])
-            if is_derived
+            if block_add_rows
             else self.themes.actual_theme["primary"]
         )
         try:
@@ -234,8 +343,28 @@ class EditableColumn(ft.Container):
     # ------------------------------------------------------------------ #
 
     def _load_rows(self):
-        values = self._entry.get("values", [])
-        self.rows_col.controls = [self._make_cell(v) for v in values] or [self._make_cell()]
+        values = self._entry_values()
+        errors = self._entry_errors()
+
+        if is_constant_type(self._var_type()):
+            values = values[:1]
+
+        if self._supports_per_value_error():
+            rows = [
+                self._make_row(v, errors[i] if i < len(errors) else "")
+                for i, v in enumerate(values)
+            ]
+        else:
+            rows = [self._make_row(v) for v in values]
+
+        if not rows:
+            rows = [self._make_row()]
+
+        if is_constant_type(self._var_type()):
+            rows = rows[:1]
+
+        self.rows_col.controls = rows
+        self._sync_global_error_field(errors)
         self._refresh_unit_dropdowns()
 
     def _refresh_unit_dropdowns(self):
@@ -247,6 +376,7 @@ class EditableColumn(ft.Container):
         self._update_header()
         self._update_formula_badge()
         self._apply_rows_mode()
+        self._sync_global_error_field(self._entry_errors())
         self._apply_derived_controls_state()
 
     def _update_header(self):
@@ -266,23 +396,43 @@ class EditableColumn(ft.Container):
 
     def sync_with_pool(self):
         """Update row TextFields in-place from pool, preserving focus."""
-        values = self._entry.get("values", [])
+        values = self._entry_values()
+        errors = self._entry_errors()
+
+        if is_constant_type(self._var_type()):
+            values = values[:1]
+
         rows = self.rows_col.controls
 
-        # Reconcile row count
-        while len(rows) < len(values):
-            rows.append(self._make_cell())
-        del rows[len(values):]
-        if not values:
-            rows.append(self._make_cell())
+        if any(not self._row_matches_mode(row) for row in rows):
+            self._load_rows()
+            rows = self.rows_col.controls
 
-        # Update values without touching focused fields
-        for cell, val in zip(rows, values):
-            if isinstance(cell, ft.TextField) and not getattr(cell, "focused", False):
-                new = str(val)
-                if cell.value != new:
-                    cell.value = new
-        self._apply_rows_mode()
+        target_len = max(1, len(values))
+        if is_constant_type(self._var_type()):
+            target_len = 1
+
+        while len(rows) < target_len:
+            rows.append(self._make_row())
+        del rows[target_len:]
+
+        for idx, row in enumerate(rows):
+            value_cell, error_cell = self._extract_row_cells(row)
+            next_value = str(values[idx]) if idx < len(values) else ""
+            if (
+                value_cell is not None
+                and not getattr(value_cell, "focused", False)
+                and value_cell.value != next_value
+            ):
+                value_cell.value = next_value
+
+            if error_cell is not None:
+                next_error = str(errors[idx]) if idx < len(errors) else ""
+                if (
+                    not getattr(error_cell, "focused", False)
+                    and error_cell.value != next_error
+                ):
+                    error_cell.value = next_error
 
         self._refresh_unit_dropdowns()
 
@@ -302,20 +452,40 @@ class EditableColumn(ft.Container):
     def sync_pool(self):
         """Write current TextField values back to the pool."""
         entry = self._entry
-        values = (
-            entry.get("values", [])
-            if self._is_derived()
-            else [
-                self._parse_cell(c) for c in self.rows_col.controls
-                if isinstance(c, ft.TextField)
-            ]
-        )
+        var_type = self._var_type()
+        formula = entry.get("formula", "")
+
+        if self._is_derived():
+            values = self._entry_values()
+        else:
+            values = []
+            for row in self.rows_col.controls:
+                value_cell, _ = self._extract_row_cells(row)
+                if isinstance(value_cell, ft.TextField):
+                    values.append(self._parse_cell(value_cell))
+
+        if is_constant_type(var_type):
+            values = values[:1]
+
+        if self._supports_single_error():
+            errors = [self._parse_cell(self.global_error_field)]
+        elif self._supports_per_value_error():
+            errors = []
+            for row in self.rows_col.controls:
+                _, error_cell = self._extract_row_cells(row)
+                if isinstance(error_cell, ft.TextField):
+                    errors.append(self._parse_cell(error_cell))
+        else:
+            errors = []
+
         self.pool[self.current_name] = {
             "values": values,
+            "errors": errors,
+            "type": var_type,
             "magnitude": entry.get("magnitude", "none"),
             "unit": entry.get("unit", "none"),
             "description": self.description_field.value,
-            "formula": entry.get("formula", ""),
+            "formula": formula if is_formula_type(var_type) else "",
         }
 
     def get_export_data(self):
@@ -323,6 +493,8 @@ class EditableColumn(ft.Container):
         return {
             "name": self.current_name,
             "values": entry.get("values", []),
+            "errors": entry.get("errors", []),
+            "type": infer_variable_type(entry),
             "magnitude": entry.get("magnitude", "none"),
             "unit": entry.get("unit", "none"),
             "description": entry.get("description", ""),
@@ -349,10 +521,16 @@ class EditableColumn(ft.Container):
         self.sync_pool()
         self._notify_change()
 
-    def _add_row(self, e):
-        if self._is_derived():
+    def _on_global_error_change(self, e=None):
+        if self._is_derived() or not self._supports_single_error():
             return
-        self.rows_col.controls.append(self._make_cell())
+        self.sync_pool()
+        self._notify_change()
+
+    def _add_row(self, e):
+        if self._is_derived() or is_constant_type(self._var_type()):
+            return
+        self.rows_col.controls.append(self._make_row())
         self.sync_pool()
         self._notify_change()
 
@@ -379,19 +557,22 @@ class EditableColumn(ft.Container):
             return
 
         import asyncio
+
         if asyncio.iscoroutinefunction(open_variable_settings_modal):
-            asyncio.create_task(open_variable_settings_modal(
-                page,
-                self.current_name,
-                self.pool,
-                self._notify_change
-            ))
+            asyncio.create_task(
+                open_variable_settings_modal(
+                    page,
+                    self.current_name,
+                    self.pool,
+                    self._notify_change,
+                )
+            )
         else:
             open_variable_settings_modal(
                 page,
                 self.current_name,
                 self.pool,
-                self._notify_change
+                self._notify_change,
             )
 
     # ------------------------------------------------------------------ #

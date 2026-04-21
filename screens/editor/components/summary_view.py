@@ -4,6 +4,7 @@ from flet_base.components.texts import body, subtitle
 from flet_base.components.buttons import icon_btn
 from functools import partial
 from screens.editor.components.latex_dropdown import get_latex_widget
+from utils.variable_types import VARIABLE_TYPE_LABELS, infer_variable_type
 
 
 def SummaryView(pool, themes, on_open_settings=None):
@@ -23,14 +24,8 @@ def SummaryView(pool, themes, on_open_settings=None):
         magnitude = entry.get("magnitude", "none")
         unit = entry.get("unit", "none")
         description = entry.get("description", "")
-
-        v_type = (
-            tm.translate("Vector")
-            if count > 1
-            else tm.translate("Escalar")
-            if count == 1
-            else tm.translate("Vacío")
-        )
+        var_type_key = infer_variable_type(entry)
+        v_type = tm.translate(VARIABLE_TYPE_LABELS.get(var_type_key, var_type_key))
 
         # Badge para el número si tiene datos
         num_badge = ft.Container(
