@@ -447,4 +447,8 @@ default_units = {
         "mil_nato": {"factor": 0.000981748, "use_prefixes": False},
         "gon": {"factor": 0.01570796, "use_prefixes": False},
     },
+    "Dimensionless": {
+        "1": {"factor": 1.0, "use_prefixes": False},
+    },
 }
+
