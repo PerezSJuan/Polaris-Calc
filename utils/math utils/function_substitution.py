@@ -113,8 +113,8 @@ def check_dimensions(expr: sp.Expr, variables: dict) -> str:
             _, unit = resolve(str(node), variables)
             return unit
 
-        elif isinstance(node, sp.Number):
-            return "1"  # Pure numbers are dimensionless
+        elif isinstance(node, (sp.Number, sp.NumberSymbol)):
+            return "1"  # Pure numbers and constants like pi are dimensionless
 
         elif isinstance(node, sp.Add):
             units = [_check(a) for a in node.args]
@@ -181,8 +181,8 @@ def evaluate(
             val, unit = resolve(str(node), variables)
             return float(val), unit
 
-        elif isinstance(node, sp.Number):
-            return float(node), "1"
+        elif isinstance(node, (sp.Number, sp.NumberSymbol)):
+            return float(node.evalf()), "1"
 
         elif isinstance(node, sp.Add):
             vals = [_eval(a) for a in node.args]

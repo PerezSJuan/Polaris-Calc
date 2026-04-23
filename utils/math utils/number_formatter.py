@@ -83,7 +83,7 @@ def smart_format(
     mantissa_value = abs_number / (10**exp)
 
     if decimals == 0:
-        mantissa_str = str(round(int(mantissa_value)))
+        mantissa_str = str(round(mantissa_value))
         if mantissa_str == "10":
             exp += 1
             exp_str = str(exp)
