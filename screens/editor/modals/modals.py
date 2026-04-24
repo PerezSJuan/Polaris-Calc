@@ -11,6 +11,7 @@ from screens.editor.components.latex_dropdown import (
 from utils.variable_types import (
     ALL_VARIABLE_TYPES,
     VARIABLE_TYPE_COLUMN_NO_ERROR,
+    VARIABLE_TYPE_FORMULA_NO_ERROR,
     VARIABLE_TYPE_LABELS,
     infer_variable_type,
     is_formula_type,
@@ -188,9 +189,8 @@ async def open_create_column_modal(
         value=VARIABLE_TYPE_COLUMN_NO_ERROR,
     )
     formula_field = text_input(
-        placeholder=tm.translate("Formula (ej: A * B + C)"),
+        placeholder=tm.translate("Formula (opcional, ej: A * B + C)"),
     )
-    formula_field.visible = False
 
     mag_dropdown = dropdown(
         label=tm.translate("Magnitud"),
@@ -262,14 +262,7 @@ async def open_create_column_modal(
 
     def on_type_change(e):
         is_formula = _is_formula_selected()
-        formula_field.visible = is_formula
-        if not is_formula:
-            formula_field.value = ""
         _set_unit_controls_enabled(not is_formula)
-        try:
-            formula_field.update()
-        except RuntimeError:
-            pass
     type_dropdown.on_change = on_type_change
 
     def _apply_parsed_unit(unit_str: str):
@@ -310,8 +303,15 @@ async def open_create_column_modal(
         raw_name = name_field.value.strip()
         var_name, unit_str = _parse_name_unit(raw_name)
         var_type = type_dropdown.value or VARIABLE_TYPE_COLUMN_NO_ERROR
-        is_derived = is_formula_type(var_type)
         formula = (formula_field.value or "").strip()
+        if formula and not is_formula_type(var_type):
+            var_type = VARIABLE_TYPE_FORMULA_NO_ERROR
+            type_dropdown.value = var_type
+            try:
+                type_dropdown.update()
+            except RuntimeError:
+                pass
+        is_derived = is_formula_type(var_type)
 
         if unit_str and not is_derived:
             # Enforce unit settings if found in name even if blur didn't fire
@@ -331,6 +331,14 @@ async def open_create_column_modal(
         if not var_name or var_name in pool:
             return
         if is_derived and not formula:
+            page.snack_bar = ft.SnackBar(
+                ft.Text(tm.translate("Debes ingresar una fórmula para crear esta variable."))
+            )
+            page.snack_bar.open = True
+            try:
+                page.update()
+            except RuntimeError:
+                pass
             return
 
         pool[var_name] = {
