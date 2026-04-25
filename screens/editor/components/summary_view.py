@@ -1,11 +1,14 @@
 import flet as ft
 from flet_base.translations import instance_translation_manager as tm
 from flet_base.components.texts import body, subtitle
-from flet_base.components.buttons import icon_btn
-from functools import partial
+
 
 from screens.editor.components.latex_dropdown import get_latex_widget
-from utils.variable_types import VARIABLE_TYPE_LABELS, infer_variable_type, is_formula_type
+from utils.variable_types import (
+    VARIABLE_TYPE_LABELS,
+    infer_variable_type,
+    is_formula_type,
+)
 
 
 def _c(t, key, opacity=1.0):
@@ -15,38 +18,49 @@ def _c(t, key, opacity=1.0):
 
 def _type_accent(var_type: str, primary: str) -> str:
     vt = var_type.lower()
-    if "formula"  in vt: return "#7C6AF7"
-    if "constant" in vt: return "#2DD4BF"
-    if "error"    in vt: return "#F59E0B"
+    if "formula" in vt:
+        return "#7C6AF7"
+    if "constant" in vt:
+        return "#2DD4BF"
+    if "error" in vt:
+        return "#F59E0B"
     return primary
 
 
 def _fmt(v: float) -> str:
-    if v == 0: return "0"
+    if v == 0:
+        return "0"
     abs_v = abs(v)
     if 0.001 <= abs_v < 10_000:
         return f"{v:.4g}"
     return f"{v:.2e}"
 
 
-def _make_card(i: int, name: str, entry: dict, themes, on_open_settings) -> ft.Container:
-    t           = themes.actual_theme
-    values      = entry.get("values", [])
-    count       = len(values)
-    magnitude   = entry.get("magnitude", "none")
-    unit        = entry.get("unit",      "none")
+def _make_card(
+    i: int, name: str, entry: dict, themes, on_open_settings
+) -> ft.Container:
+    t = themes.actual_theme
+    values = entry.get("values", [])
+    count = len(values)
+    magnitude = entry.get("magnitude", "none")
+    unit = entry.get("unit", "none")
     description = entry.get("description", "")
-    formula     = entry.get("formula",   "")
+    formula = entry.get("formula", "")
     var_type_key = infer_variable_type(entry)
-    v_type       = tm.translate(VARIABLE_TYPE_LABELS.get(var_type_key, var_type_key))
-    derived      = is_formula_type(var_type_key) and formula.strip()
-    acc          = _type_accent(var_type_key, t["primary"])
+    v_type = tm.translate(VARIABLE_TYPE_LABELS.get(var_type_key, var_type_key))
+    derived = is_formula_type(var_type_key) and formula.strip()
+    acc = _type_accent(var_type_key, t["primary"])
 
     # ── index badge ───────────────────────────────────────────────────────────
     index_badge = ft.Container(
-        content=ft.Text(str(i + 1), size=9, weight=ft.FontWeight.W_700,
-                        color=ft.Colors.with_opacity(0.9, acc)),
-        width=20, height=20,
+        content=ft.Text(
+            str(i + 1),
+            size=9,
+            weight=ft.FontWeight.W_700,
+            color=ft.Colors.with_opacity(0.9, acc),
+        ),
+        width=20,
+        height=20,
         border_radius=5,
         bgcolor=ft.Colors.with_opacity(0.15, acc),
         alignment=ft.Alignment.CENTER,
@@ -55,14 +69,17 @@ def _make_card(i: int, name: str, entry: dict, themes, on_open_settings) -> ft.C
     # ── header row ────────────────────────────────────────────────────────────
     header_row = ft.Row(
         [
-            ft.Row([index_badge, get_latex_widget(name, size=17)], spacing=8, expand=True),
+            ft.Row(
+                [index_badge, get_latex_widget(name, size=17)], spacing=8, expand=True
+            ),
             ft.IconButton(
                 icon=ft.Icons.SETTINGS_OUTLINED,
                 icon_size=16,
                 icon_color=_c(t, "on_surface", 0.35),
                 style=ft.ButtonStyle(padding=ft.Padding.all(2)),
-                on_click=partial(lambda n, e: on_open_settings and on_open_settings(n), name)
-                    if on_open_settings else None,
+                on_click=(lambda n: lambda e: on_open_settings(n))(name)
+                if on_open_settings
+                else None,
                 tooltip=tm.translate("Configurar"),
             ),
         ],
@@ -72,8 +89,12 @@ def _make_card(i: int, name: str, entry: dict, themes, on_open_settings) -> ft.C
 
     # ── type pill ─────────────────────────────────────────────────────────────
     type_pill = ft.Container(
-        content=ft.Text(v_type, size=9, weight=ft.FontWeight.W_600,
-                        color=ft.Colors.with_opacity(0.85, acc)),
+        content=ft.Text(
+            v_type,
+            size=9,
+            weight=ft.FontWeight.W_600,
+            color=ft.Colors.with_opacity(0.85, acc),
+        ),
         bgcolor=ft.Colors.with_opacity(0.10, acc),
         border_radius=20,
         padding=ft.Padding(8, 2, 8, 2),
@@ -95,8 +116,14 @@ def _make_card(i: int, name: str, entry: dict, themes, on_open_settings) -> ft.C
         content=ft.Row(
             [
                 ft.Text("ƒ", size=10, color=acc, weight=ft.FontWeight.BOLD),
-                ft.Text(formula, size=10, color=_c(t, "on_surface", 0.65),
-                        overflow=ft.TextOverflow.ELLIPSIS, max_lines=1, expand=True),
+                ft.Text(
+                    formula,
+                    size=10,
+                    color=_c(t, "on_surface", 0.65),
+                    overflow=ft.TextOverflow.ELLIPSIS,
+                    max_lines=1,
+                    expand=True,
+                ),
             ],
             spacing=5,
         ),
@@ -111,11 +138,17 @@ def _make_card(i: int, name: str, entry: dict, themes, on_open_settings) -> ft.C
         visible=len(single_nums) == 1,
         content=ft.Row(
             [
-                ft.Text(_fmt(single_nums[0]) if single_nums else "",
-                        size=22, weight=ft.FontWeight.W_600,
-                        color=_c(t, "on_surface", 0.90)),
-                ft.Text(unit if unit != "none" else "",
-                        size=12, color=_c(t, "on_surface", 0.42)),
+                ft.Text(
+                    _fmt(single_nums[0]) if single_nums else "",
+                    size=22,
+                    weight=ft.FontWeight.W_600,
+                    color=_c(t, "on_surface", 0.90),
+                ),
+                ft.Text(
+                    unit if unit != "none" else "",
+                    size=12,
+                    color=_c(t, "on_surface", 0.42),
+                ),
             ],
             spacing=5,
             vertical_alignment=ft.CrossAxisAlignment.BASELINE,
@@ -129,8 +162,12 @@ def _make_card(i: int, name: str, entry: dict, themes, on_open_settings) -> ft.C
                 ft.Icon(icon_name, size=13, color=_c(t, "on_surface", 0.35)),
                 ft.Column(
                     [
-                        ft.Text(label, size=9, color=_c(t, "on_surface", 0.40),
-                                weight=ft.FontWeight.W_600),
+                        ft.Text(
+                            label,
+                            size=9,
+                            color=_c(t, "on_surface", 0.40),
+                            weight=ft.FontWeight.W_600,
+                        ),
                         ft.Text(value, size=11, color=_c(t, "on_surface", 0.75)),
                     ],
                     spacing=0,
@@ -140,18 +177,18 @@ def _make_card(i: int, name: str, entry: dict, themes, on_open_settings) -> ft.C
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
         )
 
-    n_label    = "ƒ" if derived else str(count)
-    mag_label  = magnitude if magnitude != "none" else "—"
-    unit_label = unit      if unit      != "none" else "—"
+    n_label = "ƒ" if derived else str(count)
+    mag_label = magnitude if magnitude != "none" else "—"
+    unit_label = unit if unit != "none" else "—"
 
     chips_row = ft.Row(
         [
             info_chip(ft.Icons.NUMBERS_ROUNDED, tm.translate("Datos"), n_label),
-            ft.Container(width=1, height=24,
-                         bgcolor=_c(t, "on_surface", 0.10)),   # vertical divider
+            ft.Container(
+                width=1, height=24, bgcolor=_c(t, "on_surface", 0.10)
+            ),  # vertical divider
             info_chip(ft.Icons.STRAIGHTEN_ROUNDED, tm.translate("Magnitud"), mag_label),
-            ft.Container(width=1, height=24,
-                         bgcolor=_c(t, "on_surface", 0.10)),
+            ft.Container(width=1, height=24, bgcolor=_c(t, "on_surface", 0.10)),
             info_chip(ft.Icons.SCIENCE_OUTLINED, tm.translate("Unidad"), unit_label),
         ],
         spacing=10,
@@ -176,7 +213,7 @@ def _make_card(i: int, name: str, entry: dict, themes, on_open_settings) -> ft.C
     return ft.Container(
         content=ft.Column(
             [
-                ft.Container(           # 3-px accent top strip
+                ft.Container(  # 3-px accent top strip
                     height=3,
                     bgcolor=acc,
                     border_radius=ft.BorderRadius(15, 15, 0, 0),
@@ -194,20 +231,25 @@ def _make_card(i: int, name: str, entry: dict, themes, on_open_settings) -> ft.C
             top=ft.BorderSide(1, _c(t, "on_surface", 0.08)),
             bottom=ft.BorderSide(1, _c(t, "on_surface", 0.08)),
         ),
-        shadow=[ft.BoxShadow(
-            spread_radius=0, blur_radius=10, offset=ft.Offset(0, 3),
-            color=ft.Colors.with_opacity(0.10, ft.Colors.BLACK),
-        )],
+        shadow=[
+            ft.BoxShadow(
+                spread_radius=0,
+                blur_radius=10,
+                offset=ft.Offset(0, 3),
+                color=ft.Colors.with_opacity(0.10, ft.Colors.BLACK),
+            )
+        ],
         clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
     )
 
 
 def SummaryView(pool, themes, on_open_settings=None):
     t = themes.actual_theme
+    import asyncio
 
-    async def _handle_open_settings(var_name):
+    def _handle_open_settings(var_name):
         if on_open_settings:
-            await on_open_settings(var_name)
+            asyncio.create_task(on_open_settings(var_name))
 
     cards = [
         _make_card(i, name, entry, themes, _handle_open_settings)
@@ -217,11 +259,13 @@ def SummaryView(pool, themes, on_open_settings=None):
     empty_state = ft.Container(
         content=ft.Column(
             [
-                ft.Icon(ft.Icons.INBOX_OUTLINED, size=52,
-                        color=_c(t, "on_surface", 0.18)),
+                ft.Icon(
+                    ft.Icons.INBOX_OUTLINED, size=52, color=_c(t, "on_surface", 0.18)
+                ),
                 ft.Text(
                     tm.translate("No hay variables en esta sesión"),
-                    size=14, color=_c(t, "on_surface", 0.32),
+                    size=14,
+                    color=_c(t, "on_surface", 0.32),
                     text_align=ft.TextAlign.CENTER,
                 ),
             ],
@@ -242,7 +286,9 @@ def SummaryView(pool, themes, on_open_settings=None):
     )
 
     sub = body(
-        tm.translate("Vista general de todas las colecciones de datos en la sesión actual."),
+        tm.translate(
+            "Vista general de todas las colecciones de datos en la sesión actual."
+        ),
         size=13,
         color=t["on_surface"],
     )
@@ -259,7 +305,9 @@ def SummaryView(pool, themes, on_open_settings=None):
                     run_spacing=20,
                     alignment=ft.MainAxisAlignment.START,
                     wrap=True,
-                ) if cards else empty_state,
+                )
+                if cards
+                else empty_state,
             ],
             scroll=ft.ScrollMode.ADAPTIVE,
             spacing=10,
