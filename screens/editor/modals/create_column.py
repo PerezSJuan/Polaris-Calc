@@ -1,179 +1,30 @@
-import re
 import flet as ft
 from flet_base.translations import instance_translation_manager as tm
 from flet_base.components.inputs import dropdown, text_input
 from flet_base.components.modals import modal
-from flet_base.components.buttons import filled_btn, text_btn
+from flet_base.components.buttons import text_btn
 from screens.editor.components.latex_dropdown import (
     get_latex_widget,
-    latex_dropdown as make_latex_dropdown,
 )
 from utils.variable_types import (
     ALL_VARIABLE_TYPES,
     VARIABLE_TYPE_COLUMN_NO_ERROR,
     VARIABLE_TYPE_FORMULA_NO_ERROR,
     VARIABLE_TYPE_LABELS,
-    infer_variable_type,
     is_formula_type,
 )
-
-from screens.editor.utils.utils import load_default_units
-
-default_units = load_default_units()
-
-# ── SI prefix table ────────────────────────────────────────────────────────────
-SI_PREFIXES = [
-    ("\\text{--- (ninguno)}", "", 1e0),
-    ("Y \\cdot 10^{24}\\ \\text{(yotta)}", "Y", 1e24),
-    ("Z \\cdot 10^{21}\\ \\text{(zetta)}", "Z", 1e21),
-    ("E \\cdot 10^{18}\\ \\text{(exa)}", "E", 1e18),
-    ("P \\cdot 10^{15}\\ \\text{(peta)}", "P", 1e15),
-    ("T \\cdot 10^{12}\\ \\text{(tera)}", "T", 1e12),
-    ("G \\cdot 10^{9}\\ \\text{(giga)}", "G", 1e9),
-    ("M \\cdot 10^{6}\\ \\text{(mega)}", "M", 1e6),
-    ("k \\cdot 10^{3}\\ \\text{(kilo)}", "k", 1e3),
-    ("h \\cdot 10^{2}\\ \\text{(hecto)}", "h", 1e2),
-    ("da \\cdot 10^{1}\\ \\text{(deca)}", "da", 1e1),
-    ("d \\cdot 10^{-1}\\ \\text{(deci)}", "d", 1e-1),
-    ("c \\cdot 10^{-2}\\ \\text{(centi)}", "c", 1e-2),
-    ("m \\cdot 10^{-3}\\ \\text{(mili)}", "m", 1e-3),
-    ("\\mu \\cdot 10^{-6}\\ \\text{(micro)}", "µ", 1e-6),
-    ("n \\cdot 10^{-9}\\ \\text{(nano)}", "n", 1e-9),
-    ("p \\cdot 10^{-12}\\ \\text{(pico)}", "p", 1e-12),
-    ("f \\cdot 10^{-15}\\ \\text{(femto)}", "f", 1e-15),
-    ("a \\cdot 10^{-18}\\ \\text{(atto)}", "a", 1e-18),
-    ("z \\cdot 10^{-21}\\ \\text{(zepto)}", "z", 1e-21),
-    ("y \\cdot 10^{-24}\\ \\text{(yocto)}", "y", 1e-24),
-]
-
-_LATEX_TO_SYMBOL = {latex: sym for latex, sym, _ in SI_PREFIXES}
-_SYMBOL_TO_LATEX = {sym: latex for latex, sym, _ in SI_PREFIXES}
-_PREFIX_OPTIONS = [latex for latex, _, _ in SI_PREFIXES]
-_NONE_LATEX = SI_PREFIXES[0][0]
-
-
-# ── Theme helpers (only use ft.Colors, ft.Container, ft.Text directly) ─────────
-
-
-from flet_base.themes.themes import instance_themes as global_themes
-
-
-def _c(opacity, color=None):
-    col = color if color else global_themes.actual_theme["on_surface"]
-    return ft.Colors.with_opacity(opacity, col)
-
-
-def _accent(var_type: str, themes) -> str:
-    vt = var_type.lower()
-    t = themes.actual_theme
-    if "formula" in vt:
-        return t.get("formula_accent", t["primary"])
-    if "constant" in vt:
-        return t.get("constant_accent", t["secondary"])
-    if "error" in vt:
-        return t.get("error_accent", t["error"])
-    return t["primary"]
-
-
-def _divider():
-    return ft.Divider(height=1, thickness=1, color=_c(0.08))
-
-
-def _section_header(text: str) -> ft.Container:
-    """Slim uppercase label as section separator."""
-    return ft.Container(
-        content=ft.Text(
-            text.upper(),
-            size=10,
-            weight=ft.FontWeight.W_700,
-            color=_c(0.38),
-        ),
-        padding=ft.Padding(0, 10, 0, 2),
-    )
-
-
-def _card(*controls, padding=10) -> ft.Container:
-    """Groups controls in a subtle tinted card."""
-    return ft.Container(
-        content=ft.Column(list(controls), spacing=8),
-        bgcolor=_c(0.04),
-        border_radius=10,
-        border=ft.Border.all(1, _c(0.08)),
-        padding=padding,
-    )
-
-
-# ── Internal unit helpers ──────────────────────────────────────────────────────
-
-
-def _resolve_unit(unit_str: str):
-    for mag, units in default_units.items():
-        if unit_str in units:
-            return mag, _NONE_LATEX, unit_str
-    sorted_prefixes = sorted(
-        ((sym, latex) for latex, sym, _ in SI_PREFIXES if sym),
-        key=lambda x: -len(x[0]),
-    )
-    for sym, latex in sorted_prefixes:
-        matches = [sym]
-        if sym == "µ":
-            matches.append("u")
-        for m in matches:
-            if unit_str.startswith(m):
-                base = unit_str[len(m) :]
-                for mag, units in default_units.items():
-                    if base in units and units[base].get("use_prefixes", False):
-                        return mag, latex, base
-    return None
-
-
-def _parse_name_unit(raw: str):
-    raw = raw.strip()
-    match = re.fullmatch(r"(.*)\s*\(([^()]+)\)", raw)
-    if match:
-        name_part = match.group(1).strip()
-        unit_part = match.group(2).strip()
-        if _resolve_unit(unit_part):
-            return name_part, unit_part
-    return raw, ""
-
-
-def _set_prefix_enabled(prefix_dd, enabled: bool):
-    prefix_dd.opacity = 1.0 if enabled else 0.38
-    prefix_dd.menu_button.disabled = not enabled
-    try:
-        prefix_dd.update()
-    except RuntimeError:
-        pass
-
-
-def _build_prefix_dd(enabled: bool, value=None, on_change=None, width: int = 220):
-    init_val = value if value is not None else _NONE_LATEX
-    dd = make_latex_dropdown(
-        label=tm.translate("Prefijo SI"),
-        options=_PREFIX_OPTIONS,
-        value=init_val,
-        on_change=on_change,
-        width=width,
-    )
-    if not enabled:
-        dd.opacity = 0.38
-        dd.menu_button.disabled = True
-    return dd
-
-
-def _prefix_symbol(prefix_dd) -> str:
-    return _LATEX_TO_SYMBOL.get(prefix_dd.value, "")
-
-
-def _full_unit(prefix_dd, unit_dd) -> str:
-    base = unit_dd.value
-    if not base or base == "none":
-        return "none"
-    return f"{_prefix_symbol(prefix_dd)}{base}"
-
-
-# ── Modal: Nueva columna ───────────────────────────────────────────────────────
+from screens.editor.modals.utils import (
+    default_units,
+    _NONE_LATEX,
+    _c,
+    _section_header,
+    _card,
+    _parse_name_unit,
+    _build_prefix_dd,
+    _set_prefix_enabled,
+    _resolve_unit,
+    _full_unit,
+)
 
 
 async def open_create_column_modal(
@@ -342,7 +193,11 @@ async def open_create_column_modal(
                 ),
                 _section_header(tm.translate("Unidad y prefijo SI")),
                 _card(
-                    ft.Row([prefix_dropdown, unit_dropdown], spacing=10, alignment=ft.MainAxisAlignment.CENTER),
+                    ft.Row(
+                        [prefix_dropdown, unit_dropdown],
+                        spacing=10,
+                        alignment=ft.MainAxisAlignment.CENTER,
+                    ),
                 ),
             ],
             spacing=0,
@@ -662,289 +517,12 @@ async def open_create_column_modal(
                 step1,
             ],
             actions=[
-                text_btn(tm.translate("Cancelar"), on_click=lambda _: page.pop_dialog()),
-                back_btn,
-                next_btn,
-                create_btn,
-            ],
-        )
-    )
-
-
-# ── Modal: Renombrar pestaña ───────────────────────────────────────────────────
-
-
-async def open_rename_tab_modal(page, current_name, on_save):
-    rename_field = text_input(value=current_name)
-
-    # Live preview of the typed name
-    preview_text = ft.Text(
-        current_name or "…",
-        size=15,
-        weight=ft.FontWeight.W_500,
-        text_align=ft.TextAlign.CENTER,
-    )
-    preview_box = ft.Container(
-        content=preview_text,
-        alignment=ft.Alignment.CENTER,
-        bgcolor=_c(0.04),
-        border_radius=8,
-        padding=ft.Padding(12, 8, 12, 8),
-        border=ft.Border.all(1, _c(0.08)),
-    )
-
-    def _on_change(e):
-        preview_text.value = rename_field.value or "…"
-        try:
-            preview_text.update()
-        except RuntimeError:
-            pass
-
-    rename_field.on_change = _on_change
-
-    def _on_save(e):
-        new_name = rename_field.value.strip()
-        if new_name:
-            on_save(new_name)
-        page.pop_dialog()
-
-    page.show_dialog(
-        modal(
-            title_str=tm.translate("Renombrar pestaña"),
-            content=[
-                rename_field,
-                preview_box,
-            ],
-            actions=[
                 text_btn(
                     tm.translate("Cancelar"), on_click=lambda _: page.pop_dialog()
                 ),
-                filled_btn(tm.translate("Guardar"), on_click=_on_save),
-            ],
-        )
-    )
-
-
-# ── Modal: Configuración de variable ──────────────────────────────────────────
-
-
-async def open_variable_settings_modal(page, var_name, pool, on_change, themes):
-    entry = pool.get(var_name, {})
-    var_type = infer_variable_type(entry)
-    formula = entry.get("formula", "")
-    is_derived = (
-        is_formula_type(var_type) and isinstance(formula, str) and formula.strip() != ""
-    )
-
-    existing_unit = entry.get("unit", "none")
-    resolved = (
-        _resolve_unit(existing_unit) if existing_unit not in ("none", "") else None
-    )
-    init_mag = resolved[0] if resolved else entry.get("magnitude", "none")
-    init_prefix = resolved[1] if resolved else _NONE_LATEX
-    init_base = resolved[2] if resolved else existing_unit
-
-    v_type_label = tm.translate(VARIABLE_TYPE_LABELS.get(var_type, var_type))
-    acc = _accent(var_type, themes)
-
-    # ── Header card ───────────────────────────────────────────────────────────
-    type_pill = ft.Container(
-        content=ft.Text(
-            v_type_label,
-            size=9,
-            weight=ft.FontWeight.W_700,
-            color=ft.Colors.with_opacity(0.9, acc),
-        ),
-        bgcolor=ft.Colors.with_opacity(0.12, acc),
-        border_radius=20,
-        padding=ft.Padding(8, 3, 8, 3),
-    )
-
-    formula_pill = ft.Container(
-        content=ft.Row(
-            [
-                ft.Text("ƒ", size=10, color=acc, weight=ft.FontWeight.BOLD),
-                ft.Text(
-                    formula,
-                    size=10,
-                    color=_c(0.65),
-                    overflow=ft.TextOverflow.ELLIPSIS,
-                    max_lines=1,
-                ),
-            ],
-            spacing=5,
-        ),
-        bgcolor=ft.Colors.with_opacity(0.07, acc),
-        border_radius=6,
-        padding=ft.Padding(7, 3, 7, 3),
-        visible=is_derived,
-        width=160,
-    )
-
-    header_card = ft.Container(
-        content=ft.Column(
-            [
-                ft.Row(
-                    [type_pill, ft.Container(expand=True), formula_pill],
-                    alignment=ft.MainAxisAlignment.START,
-                ),
-                ft.Container(height=8),
-                ft.Row(
-                    [get_latex_widget(var_name, size=20)],
-                    alignment=ft.MainAxisAlignment.CENTER,
-                ),
-            ],
-            spacing=0,
-        ),
-        bgcolor=ft.Colors.with_opacity(0.06, acc),
-        border=ft.Border(
-            left=ft.BorderSide(3, ft.Colors.with_opacity(0.40, acc)),
-            right=ft.BorderSide(1, ft.Colors.with_opacity(0.10, acc)),
-            top=ft.BorderSide(1, ft.Colors.with_opacity(0.10, acc)),
-            bottom=ft.BorderSide(1, ft.Colors.with_opacity(0.10, acc)),
-        ),
-        border_radius=10,
-        padding=ft.Padding(14, 12, 14, 12),
-    )
-
-    # ── Description ───────────────────────────────────────────────────────────
-    def _on_desc_change(e):
-        pool[var_name]["description"] = desc_field.value.strip()
-        on_change()
-
-    desc_field = ft.TextField(
-        label=tm.translate("Descripción"),
-        value=entry.get("description", ""),
-        on_change=_on_desc_change,
-        border_radius=8,
-        text_size=13,
-        multiline=True,
-        min_lines=2,
-        max_lines=3,
-    )
-
-    # ── Unit helpers ──────────────────────────────────────────────────────────
-    async def _unit_options(mag):
-        base = [ft.DropdownOption("none")]
-        if mag in ("none", "") or mag not in default_units:
-            return base
-        return base + [ft.DropdownOption(u) for u in default_units[mag]]
-
-    def _commit_unit():
-        if is_derived:
-            return
-        pool[var_name]["unit"] = _full_unit(prefix_dropdown, unit_dropdown)
-        on_change()
-
-    def _refresh_prefix_state_s():
-        if is_derived:
-            prefix_dropdown.value = _NONE_LATEX
-            _set_prefix_enabled(prefix_dropdown, False)
-            return
-        mag = mag_dropdown.value
-        unit = unit_dropdown.value
-        supports = (
-            unit != "none"
-            and mag != "none"
-            and default_units.get(mag, {}).get(unit, {}).get("use_prefixes", False)
-        )
-        if not supports:
-            prefix_dropdown.value = _NONE_LATEX
-        _set_prefix_enabled(prefix_dropdown, supports)
-        _commit_unit()
-
-    init_supports = init_base not in ("none", "") and default_units.get(
-        init_mag, {}
-    ).get(init_base, {}).get("use_prefixes", False)
-
-    def _on_prefix_change(val):
-        if is_derived:
-            return
-        _commit_unit()
-
-    prefix_dropdown = _build_prefix_dd(
-        enabled=init_supports,
-        value=init_prefix,
-        on_change=_on_prefix_change,
-        width=150,
-    )
-
-    def _on_unit_change(e):
-        if is_derived:
-            return
-        _refresh_prefix_state_s()
-
-    unit_dropdown = dropdown(
-        label=tm.translate("Unidad"),
-        options=await _unit_options(init_mag),
-        value=init_base,
-        on_change=_on_unit_change,
-    )
-
-    async def _on_mag_change(e):
-        if is_derived:
-            return
-        mag = mag_dropdown.value
-        pool[var_name]["magnitude"] = mag
-        unit_dropdown.options = await _unit_options(mag)
-        unit_dropdown.value = "none"
-        _refresh_prefix_state_s()
-        try:
-            unit_dropdown.update()
-        except RuntimeError:
-            pass
-
-    mag_dropdown = dropdown(
-        label=tm.translate("Magnitud"),
-        options=[ft.DropdownOption("none")]
-        + [ft.DropdownOption(m) for m in default_units],
-        value=init_mag,
-        on_change=_on_mag_change,
-    )
-    mag_dropdown.disabled = is_derived
-    unit_dropdown.disabled = is_derived
-    if is_derived:
-        _set_prefix_enabled(prefix_dropdown, False)
-
-    # Notice for derived vars
-    derived_notice = ft.Container(
-        content=ft.Row(
-            [
-                ft.Icon(ft.Icons.INFO_OUTLINE_ROUNDED, size=13, color=_c(0.40)),
-                ft.Text(
-                    tm.translate(
-                        "Unidades calculadas automáticamente a partir de la fórmula."
-                    ),
-                    size=11,
-                    color=_c(0.45),
-                ),
-            ],
-            spacing=6,
-        ),
-        bgcolor=_c(0.03),
-        border_radius=7,
-        padding=ft.Padding(10, 6, 10, 6),
-        visible=is_derived,
-    )
-
-    page.show_dialog(
-        modal(
-            title_str=tm.translate("Configuración de variable"),
-            content=[
-                header_card,
-                _section_header(tm.translate("Descripción")),
-                desc_field,
-                _section_header(tm.translate("Unidad física")),
-                _card(
-                    ft.Row([mag_dropdown], alignment=ft.MainAxisAlignment.CENTER),
-                    ft.Row([prefix_dropdown, unit_dropdown], spacing=10, alignment=ft.MainAxisAlignment.CENTER),
-                    derived_notice,
-                ),
-            ],
-            actions=[
-                filled_btn(
-                    tm.translate("Cerrar"), on_click=lambda _: page.pop_dialog()
-                ),
+                back_btn,
+                next_btn,
+                create_btn,
             ],
         )
     )

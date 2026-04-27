@@ -23,7 +23,7 @@ from utils.variable_types import (
     infer_variable_type,
     is_formula_type,
 )
-from screens.editor.modals.modals import (
+from screens.editor.modals import (
     open_create_column_modal,
     open_rename_tab_modal,
     open_variable_settings_modal,
@@ -330,7 +330,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
                     pool,
                     themes,
                     on_open_settings=lambda name: open_variable_settings_modal(
-                        data.page, name, pool, on_column_data_changed
+                        data.page, name, pool, on_column_data_changed, themes
                     ),
                 )
             )

@@ -1,3 +1,4 @@
+import asyncio
 import flet as ft
 from flet_base.components.buttons import icon_btn
 
@@ -50,7 +51,7 @@ def EditorTabBar(
                 [
                     icon_btn(
                         icon=ft.Icons.EDIT_OUTLINED,
-                        on_click=lambda e, idx=i: on_rename_tab(idx),
+                        on_click=lambda e, idx=i: asyncio.create_task(on_rename_tab(idx)),
                         icon_size=14,
                     ),
                     icon_btn(

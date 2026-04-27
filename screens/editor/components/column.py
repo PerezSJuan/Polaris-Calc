@@ -3,7 +3,7 @@ from flet_base.translations import instance_translation_manager as tm
 import flet_base.components.texts as txt
 from flet_base.components.inputs import dropdown
 from screens.editor.components.latex_dropdown import latex_dropdown
-from screens.editor.modals.modals import open_variable_settings_modal
+from screens.editor.modals import open_variable_settings_modal
 
 from screens.editor.utils.utils import load_default_units
 from utils.variable_types import (

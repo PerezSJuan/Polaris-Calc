@@ -225,12 +225,12 @@ def _make_card(
         ),
         width=230,
         border_radius=15,
-        bgcolor=_c(t, "on_surface", 0.05),
+        bgcolor=t["surface"],
         border=ft.Border(
             left=ft.BorderSide(3, ft.Colors.with_opacity(0.22, acc)),
-            right=ft.BorderSide(1, _c(t, "on_surface", 0.08)),
-            top=ft.BorderSide(1, _c(t, "on_surface", 0.08)),
-            bottom=ft.BorderSide(1, _c(t, "on_surface", 0.08)),
+            right=ft.BorderSide(1, _c(t, "on_surface", 0.05)),
+            top=ft.BorderSide(1, _c(t, "on_surface", 0.05)),
+            bottom=ft.BorderSide(1, _c(t, "on_surface", 0.05)),
         ),
         shadow=[
             ft.BoxShadow(
