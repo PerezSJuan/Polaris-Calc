@@ -16,15 +16,16 @@ def _c(t, key, opacity=1.0):
     return ft.Colors.with_opacity(opacity, col) if opacity < 1.0 else col
 
 
-def _type_accent(var_type: str, primary: str) -> str:
+def _type_accent(var_type: str, themes) -> str:
     vt = var_type.lower()
+    t = themes.actual_theme
     if "formula" in vt:
-        return "#7C6AF7"
+        return t.get("formula_accent", t["primary"])
     if "constant" in vt:
-        return "#2DD4BF"
+        return t.get("constant_accent", t["secondary"])
     if "error" in vt:
-        return "#F59E0B"
-    return primary
+        return t.get("error_accent", t["error"])
+    return t["primary"]
 
 
 def _fmt(v: float) -> str:
@@ -49,7 +50,7 @@ def _make_card(
     var_type_key = infer_variable_type(entry)
     v_type = tm.translate(VARIABLE_TYPE_LABELS.get(var_type_key, var_type_key))
     derived = is_formula_type(var_type_key) and formula.strip()
-    acc = _type_accent(var_type_key, t["primary"])
+    acc = _type_accent(var_type_key, themes)
 
     # ── index badge ───────────────────────────────────────────────────────────
     index_badge = ft.Container(

@@ -29,15 +29,16 @@ def _c(t, key, opacity=1.0):
     return ft.Colors.with_opacity(opacity, col) if opacity < 1.0 else col
 
 
-def _type_accent(var_type: str, primary: str) -> str:
+def _type_accent(var_type: str, themes) -> str:
     vt = var_type.lower()
+    t = themes.actual_theme
     if "formula" in vt:
-        return "#7C6AF7"
+        return t.get("formula_accent", t["primary"])
     if "constant" in vt:
-        return "#2DD4BF"
+        return t.get("constant_accent", t["secondary"])
     if "error" in vt:
-        return "#F59E0B"
-    return primary
+        return t.get("error_accent", t["error"])
+    return t["primary"]
 
 
 def _fmt(v: float) -> str:
@@ -105,7 +106,7 @@ class EditableColumn(ft.Container):
 
     def _build_ui(self):
         t = self.themes.actual_theme
-        acc = _type_accent(self._var_type(), t["primary"])
+        acc = _type_accent(self._var_type(), self.themes)
 
         # ── 3-px accent strip ─────────────────────────────────────────────────
         self._accent_strip = ft.Container(
@@ -465,7 +466,7 @@ class EditableColumn(ft.Container):
         formula = self._entry.get("formula", "")
         has_formula = self._is_derived()
         t = self.themes.actual_theme
-        acc = _type_accent(self._var_type(), t["primary"])
+        acc = _type_accent(self._var_type(), self.themes)
         self.formula_badge.visible = has_formula
         if has_formula:
             self.formula_badge.content.value = f"ƒ  {formula}"
@@ -517,7 +518,7 @@ class EditableColumn(ft.Container):
 
     def _update_accent(self):
         t = self.themes.actual_theme
-        acc = _type_accent(self._var_type(), t["primary"])
+        acc = _type_accent(self._var_type(), self.themes)
         self._accent_strip.bgcolor = acc
         try:
             self._accent_strip.update()
@@ -726,12 +727,12 @@ class EditableColumn(ft.Container):
         if asyncio.iscoroutinefunction(open_variable_settings_modal):
             asyncio.create_task(
                 open_variable_settings_modal(
-                    page, self.current_name, self.pool, self._notify_change
+                    page, self.current_name, self.pool, self._notify_change, self.themes
                 )
             )
         else:
             open_variable_settings_modal(
-                page, self.current_name, self.pool, self._notify_change
+                page, self.current_name, self.pool, self._notify_change, self.themes
             )
 
     @staticmethod

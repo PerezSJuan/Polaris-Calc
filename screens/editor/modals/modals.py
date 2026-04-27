@@ -55,19 +55,24 @@ _NONE_LATEX = SI_PREFIXES[0][0]
 # ── Theme helpers (only use ft.Colors, ft.Container, ft.Text directly) ─────────
 
 
-def _c(opacity, color=ft.Colors.ON_SURFACE):
-    return ft.Colors.with_opacity(opacity, color)
+from flet_base.themes.themes import instance_themes as global_themes
 
 
-def _accent(var_type: str, primary: str) -> str:
+def _c(opacity, color=None):
+    col = color if color else global_themes.actual_theme["on_surface"]
+    return ft.Colors.with_opacity(opacity, col)
+
+
+def _accent(var_type: str, themes) -> str:
     vt = var_type.lower()
+    t = themes.actual_theme
     if "formula" in vt:
-        return "#7C6AF7"
+        return t.get("formula_accent", t["primary"])
     if "constant" in vt:
-        return "#2DD4BF"
+        return t.get("constant_accent", t["secondary"])
     if "error" in vt:
-        return "#F59E0B"
-    return primary
+        return t.get("error_accent", t["error"])
+    return t["primary"]
 
 
 def _divider():
@@ -723,7 +728,7 @@ async def open_rename_tab_modal(page, current_name, on_save):
 # ── Modal: Configuración de variable ──────────────────────────────────────────
 
 
-async def open_variable_settings_modal(page, var_name, pool, on_change):
+async def open_variable_settings_modal(page, var_name, pool, on_change, themes):
     entry = pool.get(var_name, {})
     var_type = infer_variable_type(entry)
     formula = entry.get("formula", "")
@@ -740,7 +745,7 @@ async def open_variable_settings_modal(page, var_name, pool, on_change):
     init_base = resolved[2] if resolved else existing_unit
 
     v_type_label = tm.translate(VARIABLE_TYPE_LABELS.get(var_type, var_type))
-    acc = _accent(var_type, ft.Colors.PRIMARY)
+    acc = _accent(var_type, themes)
 
     # ── Header card ───────────────────────────────────────────────────────────
     type_pill = ft.Container(

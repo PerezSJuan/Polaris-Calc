@@ -5,7 +5,7 @@ import flet as ft
 import flet_base.router as fr
 from flet_base.config import flet_config
 from flet_base.translations import instance_translation_manager as tm
-from flet_base.themes import instance_themes as themes
+from flet_base.themes.themes import themes as ThemesClass
 import flet_base.components.texts as txt
 
 
@@ -20,46 +20,56 @@ def get_assets_dir() -> Path:
 
 
 # -----------CONFIG-----------------
-flet_config.light_theme = {
-    "primary": "#6200EE",
-    "on_primary": "#FFFFFF",
-    "secondary": "#03DAC6",
-    "on_secondary": "#000000",
-    "background": "#FFFFFF",
-    "on_background": "#000000",
-    "surface": "#FFFFFF",
-    "on_surface": "#000000",
-    "text_color": "#000000",
-    "error": "#B00020",
-    "on_error": "#FFFFFF",
-    "warning": "#FFB300",
-    "success": "#388E3C",
-    "link": "#0000FF",
-}
-flet_config.dark_theme = {
-    "primary": "#BB86FC",
-    "on_primary": "#000000",
-    "secondary": "#03DAC6",
-    "on_secondary": "#000000",
-    "background": "#121212",
-    "on_background": "#FFFFFF",
-    "surface": "#1E1E1E",
-    "on_surface": "#FFFFFF",
-    "text_color": "#FFFFFF",
-    "error": "#CF6679",
-    "on_error": "#000000",
-    "warning": "#FFB300",
-    "success": "#66BB6A",
-    "link": "#5252FF",
-}
-flet_config.default_theme_mode = "dark"
+flet_config.default_layout_spacing = 10
+flet_config.default_layout_threshold = 0
 
+flet_config.light_theme.update({
+    "primary": "#0B7D73",
+    "on_primary": "#FFFFFF",
+    "secondary": "#18B7B0",
+    "on_secondary": "#062F2C",
+    "background": "#F7F9F9",
+    "on_background": "#0F172A",
+    "surface": "#FFFFFF",
+    "on_surface": "#111827",
+    "text_color": "#0F172A",
+    "error": "#D14343",
+    "on_error": "#FFFFFF",
+    "warning": "#F59E0B",
+    "success": "#15803D",
+    "link": "#2563EB",
+    "formula_accent": "#7C6AF7",
+    "constant_accent": "#2DD4BF",
+    "error_accent": "#F59E0B",
+})
+
+flet_config.dark_theme.update({
+    "primary": "#14B8A6",
+    "on_primary": "#042F2E",
+    "secondary": "#2DD4BF",
+    "on_secondary": "#042F2E",
+    "background": "#0B1214",
+    "on_background": "#E6F1F1",
+    "surface": "#0F1A1D",
+    "on_surface": "#D1E7E7",
+    "text_color": "#E6F1F1",
+    "error": "#F87171",
+    "on_error": "#1A0B0B",
+    "warning": "#FBBF24",
+    "success": "#4ADE80",
+    "link": "#60A5FA",
+    "formula_accent": "#7C6AF7",
+    "constant_accent": "#2DD4BF",
+    "error_accent": "#F59E0B",
+})
+
+flet_config.default_theme_mode = "dark"
 flet_config.default_language = "en"
 flet_config.translations_csv_path = os.path.join(get_assets_dir(), "translations.csv")
 flet_config.translations_csv_separator = ","
 
-flet_config.default_layout_spacing = 10
-flet_config.default_layout_threshold = 0
+from flet_base.themes.themes import instance_themes as themes
+themes.__init__() # Re-read config after updates
 
 
 # _____________AWAKE APP________________
@@ -82,6 +92,7 @@ async def Awake(data: fr.DataSystem):
     data.page.window.resizable = True
     data.page.window.min_width = 500
     data.page.window.min_height = 0
+    data.page.theme_animation = ft.Animation(0)
 
     await tm.awake(data.page)
     await themes.awake(data.page)
@@ -100,8 +111,35 @@ async def Awake(data: fr.DataSystem):
 # _____________TOPBAR________________
 @app.shell()
 async def TopBar(data: fr.DataSystem, view: ft.View) -> ft.View:
-    # Get the topbar component
-    topbar = create_topbar(data.page, themes.actual_theme, tm, data.shared)
+    # --- Optimized Custom Theme Switcher ---
+    async def custom_switch_theme(page: ft.Page):
+        # 1. Determine and set the new state in silence
+        if themes.actual_theme == themes.light_theme:
+            new_mode = ft.ThemeMode.DARK
+            themes.actual_theme = themes.dark_theme
+            pref = "dark"
+        else:
+            new_mode = ft.ThemeMode.LIGHT
+            themes.actual_theme = themes.light_theme
+            pref = "light"
+
+        # 2. Apply state to page properties (without calling page.update() yet)
+        page.theme_mode = new_mode
+        page.bgcolor = themes.actual_theme["background"]
+        
+        # 3. Save preference asynchronously
+        await ft.SharedPreferences().set("theme", pref)
+
+        # 4. Trigger the route refresh. 
+        # The router's on_route_change will call page.update() at the end,
+        # sending EVERYTHING (theme + new controls) in a single transaction.
+        class RefreshEvent:
+            def __init__(self, route):
+                self.route = route
+        
+        await page.on_route_change(RefreshEvent(page.route))
+
+    topbar = create_topbar(data.page, themes.actual_theme, tm, custom_switch_theme, data.shared)
 
     # Store original horizontal alignment to apply it to the content area
     # This ensures the TopBar can STRETCH to full width while content remains centered/aligned as intended

@@ -3,7 +3,9 @@ from utils.file_utils import save_plc, load_plc
 from utils.variable_types import VARIABLE_TYPE_COLUMN_NO_ERROR
 
 
-def create_topbar(page: ft.Page, color_scheme, translation_manager, shared=None):
+def create_topbar(
+    page: ft.Page, color_scheme, translation_manager, change_theme, shared=None
+):
     # Colors based on theme
     is_dark = page.theme_mode == ft.ThemeMode.DARK
     bg_color = (
@@ -24,12 +26,14 @@ def create_topbar(page: ft.Page, color_scheme, translation_manager, shared=None)
 
     async def handle_new(e):
         if shared is not None:
-            shared["editor_data"] = [{
-                "name": "V1",
-                "values": [],
-                "errors": [],
-                "type": VARIABLE_TYPE_COLUMN_NO_ERROR,
-            }]
+            shared["editor_data"] = [
+                {
+                    "name": "V1",
+                    "values": [],
+                    "errors": [],
+                    "type": VARIABLE_TYPE_COLUMN_NO_ERROR,
+                }
+            ]
             shared["current_file_path"] = None
         if page.route == "/editor":
             page.go("/home")
@@ -113,6 +117,9 @@ def create_topbar(page: ft.Page, color_scheme, translation_manager, shared=None)
         if trigger:
             await trigger(e)
 
+    async def handle_change_theme(e):
+        await change_theme(page)
+
     return ft.Container(
         bgcolor=bg_color,
         height=35,
@@ -191,7 +198,6 @@ def create_topbar(page: ft.Page, color_scheme, translation_manager, shared=None)
                 ),
                 ft.SubmenuButton(
                     content=ft.Text(translation_manager.translate("Datos")),
-                    visible=page.route == "/editor",
                     controls=[
                         ft.MenuItemButton(
                             content=ft.Text(
@@ -213,7 +219,7 @@ def create_topbar(page: ft.Page, color_scheme, translation_manager, shared=None)
                         ),
                         ft.MenuItemButton(
                             content=ft.Text(translation_manager.translate("Tema")),
-                            on_click=lambda _: print("Tema claro/oscuro"),
+                            on_click=handle_change_theme,
                         ),
                     ],
                 ),
