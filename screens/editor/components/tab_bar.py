@@ -47,11 +47,14 @@ def EditorTabBar(
         )
 
         if not is_fixed:
+            async def on_rename_click(e, idx=i):
+                await on_rename_tab(idx)
+
             controls.extend(
                 [
                     icon_btn(
                         icon=ft.Icons.EDIT_OUTLINED,
-                        on_click=lambda e, idx=i: asyncio.create_task(on_rename_tab(idx)),
+                        on_click=on_rename_click,
                         icon_size=14,
                     ),
                     icon_btn(
