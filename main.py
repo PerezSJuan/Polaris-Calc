@@ -23,45 +23,49 @@ def get_assets_dir() -> Path:
 flet_config.default_layout_spacing = 10
 flet_config.default_layout_threshold = 0
 
-flet_config.light_theme.update({
-    "primary": "#0B7D73",
-    "on_primary": "#FFFFFF",
-    "secondary": "#18B7B0",
-    "on_secondary": "#062F2C",
-    "background": "#F7F9F9",
-    "on_background": "#0F172A",
-    "surface": "#FFFFFF",
-    "on_surface": "#111827",
-    "text_color": "#0F172A",
-    "error": "#D14343",
-    "on_error": "#FFFFFF",
-    "warning": "#F59E0B",
-    "success": "#15803D",
-    "link": "#2563EB",
-    "formula_accent": "#7C6AF7",
-    "constant_accent": "#2DD4BF",
-    "error_accent": "#F59E0B",
-})
+flet_config.light_theme.update(
+    {
+        "primary": "#0B7D73",
+        "on_primary": "#FFFFFF",
+        "secondary": "#18B7B0",
+        "on_secondary": "#062F2C",
+        "background": "#F7F9F9",
+        "on_background": "#0F172A",
+        "surface": "#FFFFFF",
+        "on_surface": "#111827",
+        "text_color": "#0F172A",
+        "error": "#D14343",
+        "on_error": "#FFFFFF",
+        "warning": "#F59E0B",
+        "success": "#15803D",
+        "link": "#2563EB",
+        "formula_accent": "#7C6AF7",
+        "constant_accent": "#2DD4BF",
+        "error_accent": "#F59E0B",
+    }
+)
 
-flet_config.dark_theme.update({
-    "primary": "#14B8A6",
-    "on_primary": "#042F2E",
-    "secondary": "#2DD4BF",
-    "on_secondary": "#042F2E",
-    "background": "#0B1214",
-    "on_background": "#E6F1F1",
-    "surface": "#0F1A1D",
-    "on_surface": "#D1E7E7",
-    "text_color": "#E6F1F1",
-    "error": "#F87171",
-    "on_error": "#1A0B0B",
-    "warning": "#FBBF24",
-    "success": "#4ADE80",
-    "link": "#60A5FA",
-    "formula_accent": "#7C6AF7",
-    "constant_accent": "#2DD4BF",
-    "error_accent": "#F59E0B",
-})
+flet_config.dark_theme.update(
+    {
+        "primary": "#14B8A6",
+        "on_primary": "#042F2E",
+        "secondary": "#2DD4BF",
+        "on_secondary": "#042F2E",
+        "background": "#0B1214",
+        "on_background": "#E6F1F1",
+        "surface": "#0F1A1D",
+        "on_surface": "#D1E7E7",
+        "text_color": "#E6F1F1",
+        "error": "#F87171",
+        "on_error": "#1A0B0B",
+        "warning": "#FBBF24",
+        "success": "#4ADE80",
+        "link": "#60A5FA",
+        "formula_accent": "#7C6AF7",
+        "constant_accent": "#2DD4BF",
+        "error_accent": "#F59E0B",
+    }
+)
 
 flet_config.default_theme_mode = "dark"
 flet_config.default_language = "en"
@@ -69,7 +73,8 @@ flet_config.translations_csv_path = os.path.join(get_assets_dir(), "translations
 flet_config.translations_csv_separator = ","
 
 from flet_base.themes.themes import instance_themes as themes
-themes.__init__() # Re-read config after updates
+
+themes.__init__()  # Re-read config after updates
 
 
 # _____________AWAKE APP________________
@@ -88,7 +93,7 @@ async def Awake(data: fr.DataSystem):
             get_assets_dir(), "fonts", "ComicNeue-BoldItalic.ttf"
         ),
     }
-    data.page.window.icon = os.path.join(get_assets_dir(), "icons", "icon.png")
+    data.page.window.icon = os.path.join(get_assets_dir(), "icons", "favicon.ico")
     data.page.window.resizable = True
     data.page.window.min_width = 500
     data.page.window.min_height = 0
@@ -126,20 +131,22 @@ async def TopBar(data: fr.DataSystem, view: ft.View) -> ft.View:
         # 2. Apply state to page properties (without calling page.update() yet)
         page.theme_mode = new_mode
         page.bgcolor = themes.actual_theme["background"]
-        
+
         # 3. Save preference asynchronously
         await ft.SharedPreferences().set("theme", pref)
 
-        # 4. Trigger the route refresh. 
+        # 4. Trigger the route refresh.
         # The router's on_route_change will call page.update() at the end,
         # sending EVERYTHING (theme + new controls) in a single transaction.
         class RefreshEvent:
             def __init__(self, route):
                 self.route = route
-        
+
         await page.on_route_change(RefreshEvent(page.route))
 
-    topbar = create_topbar(data.page, themes.actual_theme, tm, custom_switch_theme, data.shared)
+    topbar = create_topbar(
+        data.page, themes.actual_theme, tm, custom_switch_theme, data.shared
+    )
 
     # Store original horizontal alignment to apply it to the content area
     # This ensures the TopBar can STRETCH to full width while content remains centered/aligned as intended
