@@ -112,8 +112,17 @@ def create_topbar(
     async def handle_go_home(e):
         await page.push_route("/home")
 
-    async def handle_trigger_create_modal(e):
-        trigger = shared.get("open_create_column_modal") if shared is not None else None
+    async def handle_trigger_create_equation(e):
+        trigger = (
+            shared.get("open_create_equation_modal") if shared is not None else None
+        )
+        if trigger:
+            await trigger(e)
+
+    async def handle_trigger_create_variable(e):
+        trigger = (
+            shared.get("open_create_variable_modal") if shared is not None else None
+        )
         if trigger:
             await trigger(e)
 
@@ -201,10 +210,17 @@ def create_topbar(
                     controls=[
                         ft.MenuItemButton(
                             content=ft.Text(
-                                translation_manager.translate("Nueva columna")
+                                translation_manager.translate("Agregar variable")
                             ),
                             disabled=page.route != "/editor",
-                            on_click=handle_trigger_create_modal,
+                            on_click=handle_trigger_create_variable,
+                        ),
+                        ft.MenuItemButton(
+                            content=ft.Text(
+                                translation_manager.translate("Agregar ecuación")
+                            ),
+                            disabled=page.route != "/editor",
+                            on_click=handle_trigger_create_equation,
                         ),
                     ],
                 ),

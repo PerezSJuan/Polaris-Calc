@@ -6,6 +6,7 @@ import flet_base.router as fr
 from flet_base.translations import instance_translation_manager as tm
 
 from flet_base.components.buttons import icon_btn
+
 current_dir = os.path.dirname(os.path.abspath(__file__))
 math_utils_path = os.path.abspath(
     os.path.join(current_dir, "..", "..", "utils", "math utils")
@@ -24,7 +25,8 @@ from utils.variable_types import (
     is_formula_type,
 )
 from screens.editor.modals import (
-    open_create_column_modal,
+    open_create_variable_modal,
+    open_create_formula_modal,
     open_rename_tab_modal,
     open_variable_settings_modal,
 )
@@ -36,6 +38,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
     """Main screen for managing and editing data vectors, with tab layout."""
 
     normalized = normalize_editor_data(data.shared.get("editor_data", []))
+
     def _normalize_errors(raw_errors):
         if isinstance(raw_errors, list):
             return raw_errors
@@ -117,6 +120,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
 
     def _current_tab() -> dict:
         return tabs[active_index[0]]
+
     def _normalize_unit_for_eval(unit: str) -> str:
         return "1" if unit in ("none", "", None) else unit
 
@@ -126,7 +130,11 @@ async def EditorScreen(data: fr.DataSystem, themes):
     def _is_derived(name: str) -> bool:
         entry = pool.get(name, {})
         formula = entry.get("formula", "")
-        return is_formula_type(infer_variable_type(entry)) and isinstance(formula, str) and formula.strip() != ""
+        return (
+            is_formula_type(infer_variable_type(entry))
+            and isinstance(formula, str)
+            and formula.strip() != ""
+        )
 
     def _show_formula_error(message):
         if formula_error_state["message"] == message:
@@ -148,7 +156,9 @@ async def EditorScreen(data: fr.DataSystem, themes):
         expr = parse_expression(formula, mode="auto")
         symbols = {str(sym) for sym in expr.free_symbols}
         unknown = sorted(
-            symbol for symbol in symbols if symbol not in pool and symbol not in CONSTANTS
+            symbol
+            for symbol in symbols
+            if symbol not in pool and symbol not in CONSTANTS
         )
         if unknown:
             raise ValueError(
@@ -247,7 +257,9 @@ async def EditorScreen(data: fr.DataSystem, themes):
 
             for name in ordered:
                 formula = pool[name].get("formula", "").strip()
-                values, unit = _evaluate_formula_vector(name, formula, dependencies[name])
+                values, unit = _evaluate_formula_vector(
+                    name, formula, dependencies[name]
+                )
                 pool[name]["values"] = values
                 pool[name]["unit"] = unit
                 pool[name]["magnitude"] = "none"
@@ -430,8 +442,8 @@ async def EditorScreen(data: fr.DataSystem, themes):
         update_shared_state()
         _try_update(columns_row)
 
-    async def trigger_create_modal(e=None):
-        await open_create_column_modal(
+    async def trigger_create_variable_modal(e=None):
+        await open_create_variable_modal(
             page=data.page,
             pool=pool,
             columns_row=columns_row,
@@ -442,7 +454,20 @@ async def EditorScreen(data: fr.DataSystem, themes):
             themes=themes,
         )
 
-    data.shared["open_create_column_modal"] = trigger_create_modal
+    async def trigger_create_formula_modal(e=None):
+        await open_create_formula_modal(
+            page=data.page,
+            pool=pool,
+            columns_row=columns_row,
+            on_column_data_changed=on_column_data_changed,
+            get_available_vars=get_available_vars,
+            refresh_all_dropdowns=refresh_all_dropdowns,
+            update_shared_state=update_shared_state,
+            themes=themes,
+        )
+
+    data.shared["open_create_variable_modal"] = trigger_create_variable_modal
+    data.shared["open_create_equation_modal"] = trigger_create_formula_modal
 
     # ------------------------------------------------------------------
     # Static Elements
