@@ -12,7 +12,7 @@ import flet as ft
 from flet_base.translations import instance_translation_manager as tm
 from flet_base.components.inputs import dropdown, text_input
 from flet_base.components.modals import modal
-from flet_base.components.buttons import text_btn
+from flet_base.components.buttons import text_btn, filled_btn
 from screens.editor.components.latex_dropdown import get_latex_widget
 from utils.variable_types import (
     ALL_VARIABLE_TYPES,
@@ -94,6 +94,7 @@ async def open_create_variable_modal(
             preview_latex_widget[0],
         ],
         spacing=6,
+        alignment=ft.MainAxisAlignment.CENTER,
     )
     preview_container = ft.Container(
         content=preview_row,
@@ -241,6 +242,7 @@ async def open_create_variable_modal(
             ],
             spacing=0,
             expand=True,
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
         ),
         visible=True,
         expand=True,
@@ -264,6 +266,7 @@ async def open_create_variable_modal(
             ],
             spacing=0,
             expand=True,
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
         ),
         visible=False,
         expand=True,
@@ -292,31 +295,21 @@ async def open_create_variable_modal(
             pass
 
     # ── Botones de navegación ─────────────────────────────────────────────────
-    back_btn = ft.TextButton(
+    back_btn = text_btn(
         tm.translate("← Atrás"),
         on_click=lambda e: _go_step0(e),
-        style=ft.ButtonStyle(color=t["text_color"]),
-        visible=False,
     )
-    next_btn = ft.Button(
+    back_btn.visible = False
+
+    next_btn = filled_btn(
         tm.translate("Siguiente →"),
         on_click=lambda e: _go_step1(e),
-        style=ft.ButtonStyle(
-            bgcolor=acc,
-            color=t["on_primary"],
-            shape=ft.RoundedRectangleBorder(radius=8),
-        ),
     )
-    create_btn = ft.Button(
+    create_btn = filled_btn(
         tm.translate("Crear variable"),
         on_click=lambda e: _save(e),
-        style=ft.ButtonStyle(
-            bgcolor=acc,
-            color=t["on_primary"],
-            shape=ft.RoundedRectangleBorder(radius=8),
-        ),
-        visible=False,
     )
+    create_btn.visible = False
 
     # ── Navegación ────────────────────────────────────────────────────────────
     def _go_step1(e):

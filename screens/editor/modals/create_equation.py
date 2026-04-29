@@ -10,7 +10,7 @@ import flet as ft
 from flet_base.translations import instance_translation_manager as tm
 from flet_base.components.inputs import dropdown, text_input
 from flet_base.components.modals import modal
-from flet_base.components.buttons import text_btn
+from flet_base.components.buttons import text_btn, filled_btn
 from screens.editor.components.latex_dropdown import get_latex_widget
 from utils.variable_types import (
     VARIABLE_TYPE_FORMULA_NO_ERROR,
@@ -75,6 +75,7 @@ async def open_create_formula_modal(
             preview_latex_widget[0],
         ],
         spacing=6,
+        alignment=ft.MainAxisAlignment.CENTER,
     )
     preview_container = ft.Container(
         content=preview_row,
@@ -189,6 +190,7 @@ async def open_create_formula_modal(
             ],
             spacing=0,
             expand=True,
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
         ),
         expand=True,
     )
@@ -252,16 +254,10 @@ async def open_create_formula_modal(
             pass
 
     # ── Botón crear ───────────────────────────────────────────────────────────
-    create_btn = ft.Button(
+    create_btn = filled_btn(
         tm.translate("Crear fórmula"),
         on_click=_save,
-        style=ft.ButtonStyle(
-            bgcolor=acc,
-            color=t["on_primary"],
-            shape=ft.RoundedRectangleBorder(radius=8),
-        ),
     )
-
     # ── Mostrar modal ─────────────────────────────────────────────────────────
     page.show_dialog(
         modal(

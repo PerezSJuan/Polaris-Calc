@@ -79,7 +79,11 @@ def _section_header(text: str) -> ft.Container:
 def _card(*controls, padding=10) -> ft.Container:
     """Groups controls in a subtle tinted card."""
     return ft.Container(
-        content=ft.Column(list(controls), spacing=8),
+        content=ft.Column(
+            list(controls),
+            spacing=8,
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+        ),
         bgcolor=_c(0.04),
         border_radius=10,
         border=ft.Border.all(1, _c(0.08)),
