@@ -5,6 +5,7 @@ VARIABLE_TYPE_COLUMN_WITH_SINGLE_ERROR = "column_with_single_error"
 VARIABLE_TYPE_COLUMN_WITH_ERROR_PER_VALUE = "column_with_error_per_value"
 VARIABLE_TYPE_FORMULA_NO_ERROR = "formula_no_error"
 VARIABLE_TYPE_FORMULA_WITH_ERROR = "formula_with_error"
+VARIABLE_TYPE_PLOT = "plot"
 
 ALL_VARIABLE_TYPES = [
     VARIABLE_TYPE_CONSTANT_NO_ERROR,
@@ -14,6 +15,7 @@ ALL_VARIABLE_TYPES = [
     VARIABLE_TYPE_COLUMN_WITH_ERROR_PER_VALUE,
     VARIABLE_TYPE_FORMULA_NO_ERROR,
     VARIABLE_TYPE_FORMULA_WITH_ERROR,
+    VARIABLE_TYPE_PLOT,
 ]
 
 VARIABLE_TYPE_LABELS = {
@@ -24,11 +26,16 @@ VARIABLE_TYPE_LABELS = {
     VARIABLE_TYPE_COLUMN_WITH_ERROR_PER_VALUE: "Columna con error por valor",
     VARIABLE_TYPE_FORMULA_NO_ERROR: "Fórmula sin error",
     VARIABLE_TYPE_FORMULA_WITH_ERROR: "Fórmula con error",
+    VARIABLE_TYPE_PLOT: "Plot",
 }
 
 FORMULA_VARIABLE_TYPES = {
     VARIABLE_TYPE_FORMULA_NO_ERROR,
     VARIABLE_TYPE_FORMULA_WITH_ERROR,
+}
+
+PLOT_VARIABLE_TYPES = {
+    VARIABLE_TYPE_PLOT,
 }
 
 CONSTANT_VARIABLE_TYPES = {
@@ -68,3 +75,7 @@ def has_single_error(var_type: str) -> bool:
 
 def has_error_per_value(var_type: str) -> bool:
     return var_type == VARIABLE_TYPE_COLUMN_WITH_ERROR_PER_VALUE
+
+
+def is_plot_type(var_type: str) -> bool:
+    return var_type == VARIABLE_TYPE_PLOT

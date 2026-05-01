@@ -126,6 +126,11 @@ def create_topbar(
         if trigger:
             await trigger(e)
 
+    async def handle_trigger_create_plot(e):
+        trigger = shared.get("open_create_plot_modal") if shared is not None else None
+        if trigger:
+            await trigger(e)
+
     async def handle_change_theme(e):
         await change_theme(page)
 
@@ -221,6 +226,13 @@ def create_topbar(
                             ),
                             disabled=page.route != "/editor",
                             on_click=handle_trigger_create_equation,
+                        ),
+                        ft.MenuItemButton(
+                            content=ft.Text(
+                                translation_manager.translate("Agregar gráfico")
+                            ),
+                            disabled=page.route != "/editor",
+                            on_click=handle_trigger_create_plot,
                         ),
                     ],
                 ),

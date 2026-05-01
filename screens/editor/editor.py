@@ -1,6 +1,8 @@
 import os
 import sys
 import uuid
+import asyncio
+from functools import partial
 import flet as ft
 import flet_base.router as fr
 from flet_base.translations import instance_translation_manager as tm
@@ -18,15 +20,18 @@ from function_substitution import CONSTANTS, evaluate, parse_expression
 
 from screens.editor.utils.utils import normalize_editor_data
 from screens.editor.components.column import EditableColumn
+from screens.editor.components.plot_column import PlotColumn
 from utils.variable_types import (
     VARIABLE_TYPE_COLUMN_NO_ERROR,
     VARIABLE_TYPE_FORMULA_WITH_ERROR,
     infer_variable_type,
     is_formula_type,
+    is_plot_type,
 )
 from screens.editor.modals import (
     open_create_variable_modal,
     open_create_formula_modal,
+    open_create_plot_modal,
     open_rename_tab_modal,
     open_variable_settings_modal,
 )
@@ -58,6 +63,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
             "formula": col.get("formula", ""),
             "type": infer_variable_type(col),
             "errors": _normalize_errors(col.get("errors", [])),
+            "plot_config": col.get("plot_config", {}),
         }
         for col in normalized["columns"]
     }
@@ -100,6 +106,15 @@ async def EditorScreen(data: fr.DataSystem, themes):
         vertical_alignment=ft.CrossAxisAlignment.START,
         spacing=20,
     )
+    summary_col = ft.Column(
+        scroll=ft.ScrollMode.ADAPTIVE,
+        expand=True,
+        spacing=0,
+    )
+    content_container = ft.Container(
+        content=columns_row,
+        expand=True,
+    )
     formula_error_state = {"message": None}
 
     # ------------------------------------------------------------------
@@ -111,6 +126,25 @@ async def EditorScreen(data: fr.DataSystem, themes):
 
     def _visible_columns() -> list[EditableColumn]:
         return [c for c in columns_row.controls if isinstance(c, EditableColumn)]
+
+    def _visible_column_names() -> set[str]:
+        """Returns names of all visible columns, including PlotColumns."""
+        names = set()
+        for c in columns_row.controls:
+            if isinstance(c, EditableColumn):
+                names.add(c.current_name)
+            elif isinstance(c, PlotColumn):
+                names.add(c.plot_name)
+        return names
+
+    def _all_named_columns() -> list[str]:
+        result = []
+        for c in columns_row.controls:
+            if isinstance(c, EditableColumn):
+                result.append(c.current_name)
+            elif isinstance(c, PlotColumn):
+                result.append(c.plot_name)
+        return result
 
     def _try_update(widget):
         try:
@@ -274,7 +308,14 @@ async def EditorScreen(data: fr.DataSystem, themes):
                 _show_formula_error(f"Error en variable derivada: {exc}")
             return False
 
-    def _make_column(name: str) -> EditableColumn:
+    def _make_column(name: str) -> ft.Control:
+        if is_plot_type(infer_variable_type(pool.get(name, {}))):
+            return PlotColumn(
+                pool=pool,
+                plot_name=name,
+                on_change=on_column_data_changed,
+                themes=themes,
+            )
         return EditableColumn(
             pool=pool,
             current_name=name,
@@ -303,12 +344,16 @@ async def EditorScreen(data: fr.DataSystem, themes):
     # ------------------------------------------------------------------
 
     def on_column_data_changed():
-        _current_tab()["columns"] = [col.current_name for col in _visible_columns()]
+        _current_tab()["columns"] = _all_named_columns()
         recalculate_derived_variables(show_errors=True)
         update_shared_state()
         for col in _visible_columns():
             col.sync_with_pool()
             col._just_changed = False
+        _update_add_column_menu_items()
+        if active_index[0] == 0:  # If we are on Summary tab
+            _refresh_ui()
+
 
     def refresh_all_dropdowns():
         for col in _visible_columns():
@@ -334,10 +379,9 @@ async def EditorScreen(data: fr.DataSystem, themes):
         _try_update(tab_bar_container)
 
     def _rebuild_columns_row():
-        columns_row.controls.clear()
         curr = _current_tab()
         if curr.get("id") == "fixed_summary":
-            columns_row.controls.append(
+            summary_col.controls = [
                 SummaryView(
                     pool,
                     themes,
@@ -345,13 +389,17 @@ async def EditorScreen(data: fr.DataSystem, themes):
                         data.page, name, pool, on_column_data_changed, themes
                     ),
                 )
-            )
+            ]
+            content_container.content = summary_col
         else:
+            columns_row.controls.clear()
             for var_name in curr["columns"]:
                 if var_name in pool:
                     columns_row.controls.append(_make_column(var_name))
+            _update_add_column_menu_items()
             columns_row.controls.append(add_column_card)
-        _try_update(columns_row)
+            content_container.content = columns_row
+        _try_update(content_container)
 
     # ------------------------------------------------------------------
     # Tab Actions
@@ -412,9 +460,14 @@ async def EditorScreen(data: fr.DataSystem, themes):
     # Column Actions
     # ------------------------------------------------------------------
 
-    async def add_ui_column(e=None):
-        visible_names = {col.current_name for col in _visible_columns()}
-        target = next((v for v in get_available_vars() if v not in visible_names), None)
+    async def add_ui_column(e=None, var_name=None):
+        if var_name:
+            target = var_name
+        else:
+            visible_names = _visible_column_names()
+            target = next(
+                (v for v in get_available_vars() if v not in visible_names), None
+            )
 
         if target is None:
             target = get_available_vars()[0] if pool else "V1"
@@ -438,7 +491,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
         else:
             controls.append(new_col)
 
-        _current_tab()["columns"] = [col.current_name for col in _visible_columns()]
+        _current_tab()["columns"] = _all_named_columns()
         update_shared_state()
         _try_update(columns_row)
 
@@ -469,11 +522,66 @@ async def EditorScreen(data: fr.DataSystem, themes):
     data.shared["open_create_variable_modal"] = trigger_create_variable_modal
     data.shared["open_create_equation_modal"] = trigger_create_formula_modal
 
+    async def trigger_create_plot_modal(e=None):
+        await open_create_plot_modal(
+            page=data.page,
+            pool=pool,
+            columns_row=columns_row,
+            on_column_data_changed=on_column_data_changed,
+            get_available_vars=get_available_vars,
+            refresh_all_dropdowns=refresh_all_dropdowns,
+            update_shared_state=update_shared_state,
+            themes=themes,
+        )
+
+    data.shared["open_create_plot_modal"] = trigger_create_plot_modal
+
     # ------------------------------------------------------------------
     # Static Elements
     # ------------------------------------------------------------------
+    add_column_menu = ft.PopupMenuButton(
+        content=ft.Container(
+            content=ft.Icon(ft.Icons.ADD_ROUNDED, size=30),
+            alignment=ft.Alignment.CENTER,
+            expand=True,
+        ),
+        items=[],
+    )
+
+    def _update_add_column_menu_items():
+        from screens.editor.components.latex_dropdown import get_latex_widget
+
+        available = get_available_vars()
+
+        items = []
+        for v in sorted(available):
+            items.append(
+                ft.PopupMenuItem(
+                    content=ft.Container(
+                        content=get_latex_widget(v),
+                        padding=ft.Padding(10, 5, 10, 5),
+                    ),
+                    on_click=partial(add_ui_column, var_name=v),
+                )
+            )
+
+        if not items:
+            items.append(
+                ft.PopupMenuItem(
+                    content=ft.Text(
+                        tm.translate("Todas las variables están en uso"),
+                        italic=True,
+                        size=12,
+                        color=ft.Colors.with_opacity(0.5, themes.actual_theme["on_surface"]),
+                    ),
+                    disabled=True,
+                )
+            )
+
+        add_column_menu.items = items
+
     add_column_card = ft.Container(
-        content=icon_btn(icon=ft.Icons.ADD_ROUNDED, on_click=add_ui_column),
+        content=add_column_menu,
         width=180,
         height=450,
         border=ft.Border.all(
@@ -496,7 +604,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
         controls=[
             tab_bar_container,
             ft.Container(
-                content=columns_row,
+                content=content_container,
                 expand=True,
                 padding=ft.Padding(10, 16, 10, 10),
                 border_radius=ft.BorderRadius(0, 12, 12, 12),

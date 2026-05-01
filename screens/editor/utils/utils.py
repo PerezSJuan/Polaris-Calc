@@ -102,6 +102,7 @@ def _normalize_columns(raw) -> list[dict]:
                 "unit": unit,
                 "description": description,
                 "formula": formula,
+                "plot_config": col.get("plot_config", {}),
             }
         )
 
