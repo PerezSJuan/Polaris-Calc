@@ -210,7 +210,22 @@ class PlotColumn(ft.Container):
 
         self._acc = acc
         self._t = t
-        self._build_ui()
+        try:
+            self._build_ui()
+        except Exception as e:
+            print(f"Error building PlotColumn for {plot_name}: {e}")
+            self._build_error_ui(str(e))
+
+    def _build_error_ui(self, err_msg):
+        t = self._t
+        self.content = ft.Container(
+            content=ft.Column([
+                ft.Icon(ft.Icons.ERROR_OUTLINE_ROUNDED, color=ft.Colors.RED, size=30),
+                ft.Text(f"Error: {err_msg}", size=12, color=_c(t, "on_surface", 0.6))
+            ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+            padding=20,
+            alignment=ft.Alignment.CENTER
+        )
 
     # ── UI ───────────────────────────────────────────────────────────────────
 

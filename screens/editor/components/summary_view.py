@@ -14,20 +14,24 @@ from utils.variable_types import (
 
 
 def _c(t, key, opacity=1.0):
-    col = t.get(key, ft.Colors.BLACK)
-    return ft.Colors.with_opacity(opacity, col) if opacity < 1.0 else col
+    # Ensure t is a dict and has the key, else fallback to black
+    col = t.get(key, "#000000") if isinstance(t, dict) else "#000000"
+    try:
+        return ft.Colors.with_opacity(opacity, col) if opacity < 1.0 else col
+    except Exception:
+        return "#000000"
 
 
 def _type_accent(var_type: str, themes) -> str:
+    t = getattr(themes, "actual_theme", {})
     vt = var_type.lower()
-    t = themes.actual_theme
     if "formula" in vt:
-        return t.get("formula_accent", t["primary"])
+        return t.get("formula_accent", t.get("primary", ft.Colors.BLUE))
     if "constant" in vt:
-        return t.get("constant_accent", t["secondary"])
+        return t.get("constant_accent", t.get("secondary", ft.Colors.BLUE))
     if "error" in vt:
-        return t.get("error_accent", t["error"])
-    return t["primary"]
+        return t.get("error_accent", t.get("error", ft.Colors.BLUE))
+    return t.get("primary", ft.Colors.BLUE)
 
 
 def _fmt(v: float) -> str:
@@ -42,7 +46,7 @@ def _fmt(v: float) -> str:
 def _make_card(
     i: int, name: str, entry: dict, themes, on_open_settings
 ) -> ft.Container:
-    t = themes.actual_theme
+    t = getattr(themes, "actual_theme", themes if isinstance(themes, dict) else {})
     values = entry.get("values", [])
     count = len(values)
     magnitude = entry.get("magnitude", "none")
@@ -249,7 +253,7 @@ def _make_card(
 def _make_plot_card(
     i: int, name: str, entry: dict, themes, on_open_settings
 ) -> ft.Container:
-    t = getattr(themes, "actual_theme", {})
+    t = getattr(themes, "actual_theme", themes if isinstance(themes, dict) else {})
     acc = t.get("formula_accent", t.get("primary", ft.Colors.BLUE))
     cfg = (entry.get("plot_config") or {}) if isinstance(entry, dict) else {}
     pt_label = str(cfg.get("plot_type", "plot")).capitalize()
@@ -401,7 +405,7 @@ def _make_plot_card(
         ),
         width=230,
         border_radius=15,
-        bgcolor=t.get("surface", ft.Colors.SURFACE),
+        bgcolor=t.get("surface", "#1e1e1e"),
         border=ft.Border(
             left=ft.BorderSide(3, ft.Colors.with_opacity(0.22, acc)),
             right=ft.BorderSide(1, _c(t, "on_surface", 0.05)),
@@ -421,7 +425,7 @@ def _make_plot_card(
 
 
 def SummaryView(pool, themes, on_open_settings=None):
-    t = getattr(themes, "actual_theme", {})
+    t = getattr(themes, "actual_theme", themes if isinstance(themes, dict) else {})
 
     def _handle_open_settings(var_name):
         if on_open_settings:
@@ -468,7 +472,7 @@ def SummaryView(pool, themes, on_open_settings=None):
 
     header = ft.Row(
         [
-            ft.Icon(ft.Icons.GRID_VIEW_ROUNDED, color=t["primary"], size=28),
+            ft.Icon(ft.Icons.GRID_VIEW_ROUNDED, color=t.get("primary", ft.Colors.BLUE), size=28),
             subtitle(tm.translate("Inventario de Variables"), size=22),
         ],
         spacing=15,
@@ -479,7 +483,7 @@ def SummaryView(pool, themes, on_open_settings=None):
             "Vista general de todas las colecciones de datos en la sesión actual."
         ),
         size=13,
-        color=t["on_surface"],
+        color=t.get("on_surface", "#ffffff"),
     )
 
     return ft.Container(
