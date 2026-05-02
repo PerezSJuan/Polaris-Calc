@@ -38,6 +38,8 @@ POSICIÓN DE LA UNIDAD
 """
 
 import re
+import math
+from decimal import Decimal, InvalidOperation
 from dataclasses import dataclass
 from typing import Optional
 
@@ -122,8 +124,19 @@ def _parse_num(m: re.Match) -> float:
     if dec_sep and decimals:
         num_str += "." + decimals
     if exp_str:
-        num_str += "e" + exp_str
-    return float(num_str)
+        num_str += "E" + exp_str  # Decimal uses E notation
+    try:
+        d = Decimal(num_str)
+        f = float(d)
+        # Detect underflow: Decimal is non-zero but float rounded to 0
+        if f == 0.0 and d != 0:
+            return math.nan
+        # Detect overflow: float became inf but input was finite
+        if math.isinf(f) and d.is_finite():
+            return math.nan
+        return f
+    except (InvalidOperation, OverflowError):
+        return math.nan
 
 
 # ---------------------------------------------------------------------------
@@ -240,8 +253,9 @@ def _build_expr(tokens: list) -> tuple[str, Optional[str]]:
     for tok in tokens:
         if isinstance(tok, tuple) and tok[0] == "unit":
             unit_parts.append(tok[1])
-        elif isinstance(tok, float):
-            expr_parts.append(repr(tok))
+        elif isinstance(tok, (float, int)):
+            # Use Decimal repr to preserve precision for very large/small numbers
+            expr_parts.append(f"Decimal({repr(str(tok))})")
         else:
             expr_parts.append(str(tok))
     return " ".join(expr_parts), " ".join(unit_parts) or None
@@ -277,7 +291,12 @@ def evaluate(text: str) -> ParsedValue:
     expr, unit = _build_expr(tokens)
 
     try:
-        value = float(eval(expr, {"__builtins__": {}}))  # noqa: S307
+        from decimal import Decimal
+        result = eval(expr, {"__builtins__": {}, "Decimal": Decimal})  # noqa: S307
+        try:
+            value = float(result)
+        except OverflowError:
+            value = math.inf if result > 0 else -math.inf
     except Exception as exc:
         raise ValueError(f"No se pudo evaluar la expresión '{expr}': {exc}") from exc
 

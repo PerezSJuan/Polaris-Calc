@@ -6,6 +6,27 @@ from utils.variable_types import (
 )
 
 
+def _load_module(relative_path: str, module_name: str):
+    """Load a module from utils/math utils/ by path (spaces in dirname)."""
+    path = Path(__file__).parents[3] / "utils" / "math utils" / relative_path
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def load_number_unit_parser():
+    """Return the evaluate() function from number_unit_parser."""
+    mod = _load_module("number_unit_parser.py", "number_unit_parser")
+    return mod.evaluate
+
+
+def load_smart_format():
+    """Return smart_format() from number_formatter."""
+    mod = _load_module("number_formatter.py", "number_formatter")
+    return mod.smart_format
+
+
 def load_default_units() -> dict:
     """Load default_units from utils/math utils/unit conversor/default_units.py."""
     units_path = (

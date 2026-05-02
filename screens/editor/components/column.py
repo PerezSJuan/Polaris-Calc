@@ -5,7 +5,10 @@ from flet_base.components.inputs import dropdown
 from screens.editor.components.latex_dropdown import latex_dropdown
 from screens.editor.modals import open_variable_settings_modal
 
-from screens.editor.utils.utils import load_default_units
+from screens.editor.utils.utils import load_default_units, load_number_unit_parser, load_smart_format
+
+_evaluate_expr = load_number_unit_parser()
+_smart_format = load_smart_format()
 from utils.variable_types import (
     has_error_per_value,
     has_single_error,
@@ -42,12 +45,12 @@ def _type_accent(var_type: str, themes) -> str:
 
 
 def _fmt(v: float) -> str:
-    if v == 0:
-        return "0"
-    abs_v = abs(v)
-    if 0.001 <= abs_v < 10_000:
-        return f"{v:.4g}"
-    return f"{v:.2e}"
+    import math
+    if not math.isfinite(v):
+        return str(v)  # "inf", "-inf", "nan"
+    if v == int(v) and abs(v) < 1e15:
+        return _smart_format(int(v))
+    return _smart_format(v)
 
 
 class EditableColumn(ft.Container):
@@ -69,6 +72,7 @@ class EditableColumn(ft.Container):
         self.available_vars_getter = available_vars_getter
         self.themes = themes
         self._just_changed = False
+        self._focused_cell = None  # tracks which TextField is currently focused
 
         t = themes.actual_theme
         self.width = _CARD_W
@@ -204,6 +208,8 @@ class EditableColumn(ft.Container):
             height=38,
             text_align=ft.TextAlign.RIGHT,
             on_change=self._on_global_error_change,
+            on_focus=self._on_cell_focus,
+            on_blur=self._on_cell_blur,
             border=ft.InputBorder.NONE,
             bgcolor=_c(t, "error", 0.06),
             border_radius=6,
@@ -395,14 +401,37 @@ class EditableColumn(ft.Container):
         t = self.themes.actual_theme
         return _c(t, "on_surface", 0.55 if self._is_derived() else 1.0)
 
+    def _on_cell_focus(self, e):
+        self._focused_cell = e.control
+
+    def _on_cell_blur(self, e):
+        cell = e.control
+        if self._focused_cell is cell:
+            self._focused_cell = None
+        # Evaluate and reformat the cell content, then submit
+        raw = (cell.value or "").strip()
+        if raw and raw not in ("-", "+", ".", ","):
+            try:
+                result = _evaluate_expr(raw).value
+                cell.value = _fmt(result)
+                cell.update()
+            except Exception:
+                pass
+        if not self._is_derived():
+            self.sync_pool()
+            self._notify_change()
+
     def _make_value_cell(self, value="", compact=False):
+        display = _fmt(value) if isinstance(value, (int, float)) else str(value)
         return ft.TextField(
-            value=str(value),
+            value=display,
             dense=True,
             width=88 if compact else None,
             height=_CELL_H,
             text_align=ft.TextAlign.RIGHT,
             on_change=self._on_cell_change,
+            on_focus=self._on_cell_focus,
+            on_blur=self._on_cell_blur,
             read_only=self._is_derived(),
             border=ft.InputBorder.NONE,
             bgcolor=self._cell_bg_color(),
@@ -413,14 +442,17 @@ class EditableColumn(ft.Container):
         )
 
     def _make_error_cell(self, value=""):
+        display = _fmt(value) if isinstance(value, (int, float)) else str(value)
         t = self.themes.actual_theme
         return ft.TextField(
-            value=str(value),
+            value=display,
             dense=True,
             width=58,
             height=_CELL_H,
             text_align=ft.TextAlign.RIGHT,
             on_change=self._on_cell_change,
+            on_focus=self._on_cell_focus,
+            on_blur=self._on_cell_blur,
             read_only=self._is_derived(),
             border=ft.InputBorder.NONE,
             bgcolor=_c(t, "error", 0.06),
@@ -487,8 +519,8 @@ class EditableColumn(ft.Container):
             self.global_error_field.value = ""
             return
         error_value = errors[0] if errors else ""
-        new_value = str(error_value) if error_value != "" else ""
-        if not getattr(self.global_error_field, "focused", False):
+        new_value = _fmt(error_value) if isinstance(error_value, (int, float)) else ""
+        if not (self.global_error_field is self._focused_cell):
             self.global_error_field.value = new_value
         self.global_error_field.read_only = self._is_derived()
         self.global_error_field.bgcolor = self._cell_bg_color()
@@ -595,17 +627,17 @@ class EditableColumn(ft.Container):
         del rows[target_len:]
         for idx, row in enumerate(rows):
             value_cell, error_cell = self._extract_row_cells(row)
-            next_value = str(values[idx]) if idx < len(values) else ""
+            next_value = _fmt(values[idx]) if idx < len(values) else ""
             if (
                 value_cell is not None
-                and not getattr(value_cell, "focused", False)
+                and value_cell is not self._focused_cell
                 and value_cell.value != next_value
             ):
                 value_cell.value = next_value
             if error_cell is not None:
-                next_error = str(errors[idx]) if idx < len(errors) else ""
+                next_error = _fmt(errors[idx]) if idx < len(errors) else ""
                 if (
-                    not getattr(error_cell, "focused", False)
+                    error_cell is not self._focused_cell
                     and error_cell.value != next_error
                 ):
                     error_cell.value = next_error
@@ -737,7 +769,10 @@ class EditableColumn(ft.Container):
 
     @staticmethod
     def _parse_cell(cell):
+        raw = (cell.value or "").strip()
+        if not raw or raw in ("-", "+", ".", ","):
+            return 0.0
         try:
-            return float(cell.value) if cell.value else 0.0
-        except ValueError:
+            return _evaluate_expr(raw).value
+        except Exception:
             return 0.0
