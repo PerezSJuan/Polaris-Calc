@@ -347,9 +347,10 @@ async def EditorScreen(data: fr.DataSystem, themes):
         _current_tab()["columns"] = _all_named_columns()
         recalculate_derived_variables(show_errors=True)
         update_shared_state()
-        for col in _visible_columns():
-            col.sync_with_pool()
-            col._just_changed = False
+        for c in columns_row.controls:
+            if isinstance(c, (EditableColumn, PlotColumn)):
+                c.sync_with_pool()
+                c._just_changed = False
         _update_add_column_menu_items()
         if active_index[0] == 0:  # If we are on Summary tab
             _refresh_ui()

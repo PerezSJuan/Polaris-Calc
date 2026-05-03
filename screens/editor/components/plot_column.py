@@ -188,6 +188,7 @@ class PlotColumn(ft.Container):
         self.plot_name = plot_name
         self.on_change = on_change
         self.themes = themes
+        self._just_changed = False
 
         t = themes.actual_theme
         acc = t.get("formula_accent", t["primary"])
@@ -258,35 +259,20 @@ class PlotColumn(ft.Container):
         header = ft.Container(
             content=ft.Row(
                 [
-                    ft.Row(
-                        [
-                            ft.Icon(ft.Icons.SHOW_CHART_ROUNDED, size=18, color=acc),
-                            ft.Text(
-                                self.plot_name,
-                                size=14,
-                                weight=ft.FontWeight.W_600,
-                                color=_c(t, "on_surface"),
-                                overflow=ft.TextOverflow.ELLIPSIS,
-                                max_lines=1,
-                                expand=True,
-                            ),
-                        ],
-                        spacing=6,
+                    ft.Icon(ft.Icons.SHOW_CHART_ROUNDED, size=18, color=acc),
+                    ft.Text(
+                        self.plot_name,
+                        size=14,
+                        weight=ft.FontWeight.W_600,
+                        color=_c(t, "on_surface"),
+                        overflow=ft.TextOverflow.ELLIPSIS,
+                        max_lines=1,
                         expand=True,
                     ),
-                    ft.IconButton(
-                        icon=ft.Icons.REFRESH_ROUNDED,
-                        icon_size=16,
-                        icon_color=_c(t, "on_surface", 0.45),
-                        tooltip=tm.translate("Actualizar gráfico"),
-                        on_click=lambda e: self._refresh_chart(),
-                        style=ft.ButtonStyle(padding=ft.Padding.all(4)),
-                    ),
                 ],
-                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                spacing=6,
             ),
-            padding=ft.Padding(left=14, top=10, right=6, bottom=4),
+            padding=ft.Padding(left=14, top=10, right=14, bottom=4),
         )
 
         desc_text = ft.Container(
@@ -405,7 +391,7 @@ class PlotColumn(ft.Container):
             expand=True,
         )
 
-    def _refresh_chart(self):
+    def sync_with_pool(self):
         """Regenera la figura y reemplaza el control chart."""
         t = self._t
         fig = _build_figure(self.pool, self.plot_name)
