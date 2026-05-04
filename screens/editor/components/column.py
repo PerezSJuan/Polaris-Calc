@@ -1,3 +1,4 @@
+import asyncio
 import flet as ft
 from flet_base.translations import instance_translation_manager as tm
 import flet_base.components.texts as txt
@@ -143,19 +144,24 @@ class LatexCell(ft.Stack):
         try:
             self.value_num = _evaluate_expr(str(val)).value
             self.edit_field.value = _fmt_edit(self.value_num)
-            self._update_display()
+            if self.page:
+                self.page.run_task(self._update_display)
+            else:
+                self.display_container.content.controls[0] = get_latex_widget(
+                    self._get_display_str(), size=13
+                )
         except:
             pass
 
     def _get_display_str(self):
         return _smart_format(self.value_num, latex=True)
 
-    def _update_display(self):
+    async def _update_display(self):
         self.display_container.content.controls[0] = get_latex_widget(
             self._get_display_str(), size=13
         )
         try:
-            self.update()
+            await self.update()
         except:
             pass
 
@@ -171,41 +177,50 @@ class LatexCell(ft.Stack):
             return _c(t, "error", 0.80)
         return _c(t, "on_surface", 1.0)
 
-    def _on_display_click(self, e):
+    async def _on_display_click(self, e):
         if self.read_only:
             return
         self.display_container.visible = False
         self.edit_field.visible = True
         self.edit_field.value = _fmt_edit(self.value_num)
         try:
-            self.update()
+            await self.update()
         except:
             pass
-        self.edit_field.focus()
+        await self.edit_field.focus()
         if self._on_focus_cb:
             # Simulate a focus event for the column to track it
             e.control = self.edit_field
-            self._on_focus_cb(e)
+            if asyncio.iscoroutinefunction(self._on_focus_cb):
+                await self._on_focus_cb(e)
+            else:
+                self._on_focus_cb(e)
 
-    def _on_blur(self, e):
+    async def _on_blur(self, e):
         self.display_container.visible = True
         self.edit_field.visible = False
         try:
             self.value_num = _evaluate_expr(self.edit_field.value).value
         except:
             pass
-        self._update_display()
+        await self._update_display()
         if self._on_blur_cb:
             e.control = self.edit_field
-            self._on_blur_cb(e)
+            if asyncio.iscoroutinefunction(self._on_blur_cb):
+                await self._on_blur_cb(e)
+            else:
+                self._on_blur_cb(e)
 
-    def _on_text_change(self, e):
+    async def _on_text_change(self, e):
         try:
             self.value_num = _evaluate_expr(self.edit_field.value).value
         except:
             pass
         if self._on_change_cb:
-            self._on_change_cb(e)
+            if asyncio.iscoroutinefunction(self._on_change_cb):
+                await self._on_change_cb(e)
+            else:
+                self._on_change_cb(e)
 
 
 class EditableColumn(ft.Container):
@@ -551,7 +566,7 @@ class EditableColumn(ft.Container):
         t = self.themes.actual_theme
         return _c(t, "on_surface", 0.55 if self._is_derived() else 1.0)
 
-    def _on_cell_focus(self, e):
+    async def _on_cell_focus(self, e):
         self._focused_cell = e.control
         cell = e.control
         # If focused, show the 'true' value for editing if it's a number
@@ -564,13 +579,13 @@ class EditableColumn(ft.Container):
                 if cell.value != expanded:
                     cell.value = expanded
                     try:
-                        cell.update()
+                        await cell.update()
                     except:
                         pass
             except Exception:
                 pass
 
-    def _on_cell_blur(self, e):
+    async def _on_cell_blur(self, e):
         cell = e.control
         if self._focused_cell is cell:
             self._focused_cell = None
@@ -581,14 +596,20 @@ class EditableColumn(ft.Container):
                 result = _evaluate_expr(raw).value
                 cell.value = _fmt(result)
                 try:
-                    cell.update()
+                    await cell.update()
                 except:
                     pass
             except Exception:
                 pass
         if not self._is_derived():
-            self.sync_pool()
-            self._notify_change()
+            if asyncio.iscoroutinefunction(self.sync_pool):
+                await self.sync_pool()
+            else:
+                self.sync_pool()
+            if asyncio.iscoroutinefunction(self._notify_change):
+                await self._notify_change()
+            else:
+                self._notify_change()
 
     def _make_value_cell(self, value="", compact=False):
         return LatexCell(
