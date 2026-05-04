@@ -34,13 +34,14 @@ def _type_accent(var_type: str, themes) -> str:
     return t.get("primary", ft.Colors.BLUE)
 
 
+from screens.editor.utils.utils import load_smart_format
+_smart_format = load_smart_format()
+
 def _fmt(v: float) -> str:
-    if v == 0:
-        return "0"
-    abs_v = abs(v)
-    if 0.001 <= abs_v < 10_000:
-        return f"{v:.4g}"
-    return f"{v:.2e}"
+    import math
+    if not math.isfinite(v):
+        return str(v)
+    return _smart_format(v, latex=True)
 
 
 def _make_card(

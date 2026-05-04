@@ -2,7 +2,7 @@ import flet as ft
 from flet_base.translations import instance_translation_manager as tm
 import flet_base.components.texts as txt
 from flet_base.components.inputs import dropdown
-from screens.editor.components.latex_dropdown import latex_dropdown
+from screens.editor.components.latex_dropdown import latex_dropdown, get_latex_widget
 from screens.editor.modals import open_variable_settings_modal
 
 from screens.editor.utils.utils import load_default_units, load_number_unit_parser, load_smart_format
@@ -48,9 +48,164 @@ def _fmt(v: float) -> str:
     import math
     if not math.isfinite(v):
         return str(v)  # "inf", "-inf", "nan"
+    # Use a larger budget (12) for the UI to avoid premature rounding/scientific notation
     if v == int(v) and abs(v) < 1e15:
-        return _smart_format(int(v))
-    return _smart_format(v)
+        return _smart_format(int(v), max_chars=12)
+    return _smart_format(v, max_chars=12)
+
+
+def _fmt_edit(v: float) -> str:
+    """Format for editing: show full number unless it is extremely large."""
+    import math
+    if not math.isfinite(v):
+        return str(v)
+    if abs(v) >= 1e20:
+        return f"{v:e}"
+    # Use enough precision to avoid scientific notation, then strip
+    res = f"{v:.15f}".rstrip("0").rstrip(".")
+    return res if res != "-0" else "0"
+
+
+class LatexCell(ft.Stack):
+    """
+    A dual-state cell:
+    - Idle: Shows formatted LaTeX using Markdown.
+    - Focused/Editing: Shows a plain TextField with the full numeric value.
+    """
+
+    def __init__(
+        self,
+        value,
+        themes,
+        on_change,
+        on_focus=None,
+        on_blur=None,
+        compact=False,
+        read_only=False,
+        is_error=False,
+    ):
+        super().__init__()
+        self.value_num = value if isinstance(value, (int, float)) else 0.0
+        self.themes = themes
+        self._on_change_cb = on_change
+        self._on_focus_cb = on_focus
+        self._on_blur_cb = on_blur
+        self.compact = compact
+        self.read_only = read_only
+        self.is_error = is_error
+
+        self.width = 88 if compact else (58 if is_error else None)
+        self.height = _CELL_H
+
+        # 1. TextField for editing
+        self.edit_field = ft.TextField(
+            value=_fmt_edit(self.value_num),
+            dense=True,
+            width=self.width,
+            height=_CELL_H,
+            text_align=ft.TextAlign.RIGHT,
+            on_change=self._on_text_change,
+            on_blur=self._on_blur,
+            read_only=read_only,
+            border=ft.InputBorder.NONE,
+            bgcolor=self._cell_bg_color(),
+            color=self._cell_text_color(),
+            border_radius=_CELL_RADIUS,
+            text_size=13,
+            content_padding=ft.Padding.symmetric(horizontal=10),
+            visible=False,
+        )
+
+        # 2. Container for display (LaTeX)
+        self.display_container = ft.Container(
+            content=ft.Row(
+                [get_latex_widget(self._get_display_str(), size=13)],
+                alignment=ft.MainAxisAlignment.END,
+            ),
+            padding=ft.Padding.symmetric(horizontal=10),
+            on_click=self._on_display_click,
+            bgcolor=self._cell_bg_color(),
+            border_radius=_CELL_RADIUS,
+            expand=True,
+            height=_CELL_H,
+            visible=True,
+        )
+
+        self.controls = [self.display_container, self.edit_field]
+
+    @property
+    def value(self):
+        # This property makes it act somewhat like a TextField for the rest of the code
+        return _fmt_edit(self.value_num)
+
+    @value.setter
+    def value(self, val):
+        try:
+            self.value_num = _evaluate_expr(str(val)).value
+            self.edit_field.value = _fmt_edit(self.value_num)
+            self._update_display()
+        except:
+            pass
+
+    def _get_display_str(self):
+        return _smart_format(self.value_num, latex=True)
+
+    def _update_display(self):
+        self.display_container.content.controls[0] = get_latex_widget(
+            self._get_display_str(), size=13
+        )
+        try:
+            self.update()
+        except:
+            pass
+
+    def _cell_bg_color(self):
+        t = self.themes.actual_theme
+        if self.is_error:
+            return _c(t, "error", 0.06)
+        return _c(t, "on_surface", 0.05)
+
+    def _cell_text_color(self):
+        t = self.themes.actual_theme
+        if self.is_error:
+            return _c(t, "error", 0.80)
+        return _c(t, "on_surface", 1.0)
+
+    def _on_display_click(self, e):
+        if self.read_only:
+            return
+        self.display_container.visible = False
+        self.edit_field.visible = True
+        self.edit_field.value = _fmt_edit(self.value_num)
+        try:
+            self.update()
+        except:
+            pass
+        self.edit_field.focus()
+        if self._on_focus_cb:
+            # Simulate a focus event for the column to track it
+            e.control = self.edit_field
+            self._on_focus_cb(e)
+
+    def _on_blur(self, e):
+        self.display_container.visible = True
+        self.edit_field.visible = False
+        try:
+            self.value_num = _evaluate_expr(self.edit_field.value).value
+        except:
+            pass
+        self._update_display()
+        if self._on_blur_cb:
+            e.control = self.edit_field
+            self._on_blur_cb(e)
+
+    def _on_text_change(self, e):
+        try:
+            self.value_num = _evaluate_expr(self.edit_field.value).value
+        except:
+            pass
+        if self._on_change_cb:
+            self._on_change_cb(e)
 
 
 class EditableColumn(ft.Container):
@@ -202,30 +357,25 @@ class EditableColumn(ft.Container):
         )
 
         # ── global error ──────────────────────────────────────────────────────
-        self.global_error_field = ft.TextField(
-            label=tm.translate("Error"),
-            dense=True,
-            height=38,
-            text_align=ft.TextAlign.RIGHT,
+        self.global_error_field = LatexCell(
+            value="",
+            themes=self.themes,
             on_change=self._on_global_error_change,
             on_focus=self._on_cell_focus,
             on_blur=self._on_cell_blur,
-            border=ft.InputBorder.NONE,
-            bgcolor=_c(t, "error", 0.06),
-            border_radius=6,
-            text_size=13,
-            content_padding=ft.Padding.symmetric(horizontal=10),
+            is_error=True,
         )
         self.global_error_container = ft.Container(
             content=self.global_error_field,
             visible=False,
+            margin=ft.Margin(0, 5, 0, 10),
         )
 
         # ── stats strip ───────────────────────────────────────────────────────
         # Must be created BEFORE _load_rows() since _refresh_stats() is called during initialization
         self._stats_container = ft.Container(
             content=self._build_stats_row(),
-            padding=ft.Padding(12, 6, 12, 6),
+            padding=ft.Padding(12, 10, 12, 10),
             bgcolor=_c(t, "on_surface", 0.03),
             border=ft.Border(top=ft.BorderSide(1, _c(t, "on_surface", 0.07))),
         )
@@ -265,7 +415,7 @@ class EditableColumn(ft.Container):
                 # expanding rows area
                 ft.Container(
                     content=self.rows_col,
-                    padding=ft.Padding(left=_PADDING, right=_PADDING, top=0, bottom=0),
+                    padding=ft.Padding(left=_PADDING, right=_PADDING, top=0, bottom=15),
                     expand=True,
                 ),
                 # fixed bottom section
@@ -403,6 +553,22 @@ class EditableColumn(ft.Container):
 
     def _on_cell_focus(self, e):
         self._focused_cell = e.control
+        cell = e.control
+        # If focused, show the 'true' value for editing if it's a number
+        raw = (cell.value or "").strip()
+        if raw and raw not in ("-", "+", ".", ","):
+            try:
+                # Try to evaluate and show expanded version
+                val = _evaluate_expr(raw).value
+                expanded = _fmt_edit(val)
+                if cell.value != expanded:
+                    cell.value = expanded
+                    try:
+                        cell.update()
+                    except:
+                        pass
+            except Exception:
+                pass
 
     def _on_cell_blur(self, e):
         cell = e.control
@@ -414,7 +580,10 @@ class EditableColumn(ft.Container):
             try:
                 result = _evaluate_expr(raw).value
                 cell.value = _fmt(result)
-                cell.update()
+                try:
+                    cell.update()
+                except:
+                    pass
             except Exception:
                 pass
         if not self._is_derived():
@@ -422,45 +591,25 @@ class EditableColumn(ft.Container):
             self._notify_change()
 
     def _make_value_cell(self, value="", compact=False):
-        display = _fmt(value) if isinstance(value, (int, float)) else str(value)
-        return ft.TextField(
-            value=display,
-            dense=True,
-            width=88 if compact else None,
-            height=_CELL_H,
-            text_align=ft.TextAlign.RIGHT,
+        return LatexCell(
+            value=value,
+            themes=self.themes,
+            compact=compact,
+            read_only=self._is_derived(),
             on_change=self._on_cell_change,
             on_focus=self._on_cell_focus,
             on_blur=self._on_cell_blur,
-            read_only=self._is_derived(),
-            border=ft.InputBorder.NONE,
-            bgcolor=self._cell_bg_color(),
-            color=self._cell_text_color(),
-            border_radius=_CELL_RADIUS,
-            text_size=13,
-            content_padding=ft.Padding.symmetric(horizontal=10),
         )
 
     def _make_error_cell(self, value=""):
-        display = _fmt(value) if isinstance(value, (int, float)) else str(value)
-        t = self.themes.actual_theme
-        return ft.TextField(
-            value=display,
-            dense=True,
-            width=58,
-            height=_CELL_H,
-            text_align=ft.TextAlign.RIGHT,
+        return LatexCell(
+            value=value,
+            themes=self.themes,
+            is_error=True,
+            read_only=self._is_derived(),
             on_change=self._on_cell_change,
             on_focus=self._on_cell_focus,
             on_blur=self._on_cell_blur,
-            read_only=self._is_derived(),
-            border=ft.InputBorder.NONE,
-            bgcolor=_c(t, "error", 0.06),
-            color=_c(t, "error", 0.80),
-            border_radius=_CELL_RADIUS,
-            text_size=13,
-            content_padding=ft.Padding.symmetric(horizontal=8),
-            tooltip=tm.translate("Error"),
         )
 
     def _make_row(self, value="", error=""):
@@ -477,14 +626,12 @@ class EditableColumn(ft.Container):
 
     @staticmethod
     def _extract_row_cells(row):
-        if isinstance(row, ft.TextField):
+        if isinstance(row, LatexCell):
             return row, None
         if isinstance(row, ft.Row):
             value_cell = row.controls[0] if len(row.controls) > 0 else None
             error_cell = row.controls[1] if len(row.controls) > 1 else None
-            if isinstance(value_cell, ft.TextField) and isinstance(
-                error_cell, ft.TextField
-            ):
+            if isinstance(value_cell, LatexCell) and isinstance(error_cell, LatexCell):
                 return value_cell, error_cell
         return None, None
 
@@ -492,7 +639,7 @@ class EditableColumn(ft.Container):
         value_cell, error_cell = self._extract_row_cells(row)
         if self._supports_per_value_error():
             return value_cell is not None and error_cell is not None
-        return isinstance(row, ft.TextField)
+        return isinstance(row, LatexCell)
 
     def _update_formula_badge(self):
         formula = self._entry.get("formula", "")
@@ -520,7 +667,10 @@ class EditableColumn(ft.Container):
             return
         error_value = errors[0] if errors else ""
         new_value = _fmt(error_value) if isinstance(error_value, (int, float)) else ""
-        if not (self.global_error_field is self._focused_cell):
+        
+        # Don't overwrite if this specific cell or its parent is focused
+        is_focused = (self.global_error_field.edit_field is self._focused_cell)
+        if not is_focused:
             self.global_error_field.value = new_value
         self.global_error_field.read_only = self._is_derived()
         self.global_error_field.bgcolor = self._cell_bg_color()
@@ -533,8 +683,10 @@ class EditableColumn(ft.Container):
                 if cell is None:
                     continue
                 cell.read_only = self._is_derived()
-                cell.bgcolor = self._cell_bg_color()
-                cell.color = self._cell_text_color()
+                try:
+                    cell.update()
+                except (RuntimeError, AssertionError):
+                    pass
 
     def _apply_derived_controls_state(self):
         if not hasattr(self, "add_row_btn"):
@@ -627,20 +779,22 @@ class EditableColumn(ft.Container):
         del rows[target_len:]
         for idx, row in enumerate(rows):
             value_cell, error_cell = self._extract_row_cells(row)
-            next_value = _fmt(values[idx]) if idx < len(values) else ""
-            if (
-                value_cell is not None
-                and value_cell is not self._focused_cell
-                and value_cell.value != next_value
-            ):
-                value_cell.value = next_value
+            
+            # Update Value Cell
+            if value_cell is not None:
+                next_value = _fmt(values[idx]) if idx < len(values) else ""
+                # Skip if this cell's editor is focused
+                if value_cell.edit_field is not self._focused_cell:
+                    if value_cell.value != next_value:
+                        value_cell.value = next_value
+            
+            # Update Error Cell
             if error_cell is not None:
                 next_error = _fmt(errors[idx]) if idx < len(errors) else ""
-                if (
-                    error_cell is not self._focused_cell
-                    and error_cell.value != next_error
-                ):
-                    error_cell.value = next_error
+                # Skip if this cell's editor is focused
+                if error_cell.edit_field is not self._focused_cell:
+                    if error_cell.value != next_error:
+                        error_cell.value = next_error
         self._refresh_unit_dropdowns()
         try:
             self.rows_col.update()
@@ -663,7 +817,7 @@ class EditableColumn(ft.Container):
             values = []
             for row in self.rows_col.controls:
                 value_cell, _ = self._extract_row_cells(row)
-                if isinstance(value_cell, ft.TextField):
+                if isinstance(value_cell, LatexCell):
                     values.append(self._parse_cell(value_cell))
         if is_constant_type(var_type):
             values = values[:1]
@@ -673,7 +827,7 @@ class EditableColumn(ft.Container):
             errors = []
             for row in self.rows_col.controls:
                 _, error_cell = self._extract_row_cells(row)
-                if isinstance(error_cell, ft.TextField):
+                if isinstance(error_cell, LatexCell):
                     errors.append(self._parse_cell(error_cell))
         else:
             errors = []
@@ -769,6 +923,8 @@ class EditableColumn(ft.Container):
 
     @staticmethod
     def _parse_cell(cell):
+        if isinstance(cell, LatexCell):
+            return cell.value_num
         raw = (cell.value or "").strip()
         if not raw or raw in ("-", "+", ".", ","):
             return 0.0
