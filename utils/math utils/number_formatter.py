@@ -76,7 +76,7 @@ def smart_format(
     mantissa_budget = max_chars - sign_chars - suffix_len
 
     if mantissa_budget < 1:
-        return original[:max_chars]
+        return original
 
     # ── Construcción de la mantisa ───────────────────────────────────────────
     decimals = max(mantissa_budget - 2, 0)  # -1 dígito entero, -1 punto
@@ -100,7 +100,7 @@ def smart_format(
             mantissa_str = (
                 f"{mantissa_value:.{decimals}f}"
                 if decimals > 0
-                else str(round(int(mantissa_value)))
+                else str(round(mantissa_value))
             )
 
     # Eliminar ceros finales innecesarios
@@ -122,7 +122,7 @@ def smart_format(
     if len(scientific) >= len(original):
         return original
 
-    return scientific[:max_chars]
+    return scientific
 
 
 # ── Demo ─────────────────────────────────────────────────────────────────────
