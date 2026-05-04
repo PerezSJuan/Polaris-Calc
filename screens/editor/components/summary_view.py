@@ -506,5 +506,4 @@ def SummaryView(pool, themes, on_open_settings=None):
             spacing=10,
         ),
         padding=30,
-        expand=True,
     )

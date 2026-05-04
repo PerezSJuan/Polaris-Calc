@@ -392,6 +392,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
                 )
             ]
             content_container.content = summary_col
+            _try_update(summary_col)
         else:
             columns_row.controls.clear()
             for var_name in curr["columns"]:
