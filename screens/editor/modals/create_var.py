@@ -15,10 +15,11 @@ from flet_base.components.modals import modal
 from flet_base.components.buttons import text_btn, filled_btn
 from screens.editor.components.latex_dropdown import get_latex_widget
 from utils.variable_types import (
-    ALL_VARIABLE_TYPES,
-    VARIABLE_TYPE_COLUMN_NO_ERROR,
     VARIABLE_TYPE_LABELS,
     FORMULA_VARIABLE_TYPES,
+    ALL_VARIABLE_TYPES,
+    VARIABLE_TYPE_COLUMN_NO_ERROR,
+    is_boolean_type,
 )
 from screens.editor.modals.utils import (
     default_units,
@@ -34,7 +35,9 @@ from screens.editor.modals.utils import (
 )
 
 # Solo los tipos que NO son fórmula
-_VARIABLE_ONLY_TYPES = [vt for vt in ALL_VARIABLE_TYPES if vt not in FORMULA_VARIABLE_TYPES]
+_VARIABLE_ONLY_TYPES = [
+    vt for vt in ALL_VARIABLE_TYPES if vt not in FORMULA_VARIABLE_TYPES
+]
 
 
 async def open_create_variable_modal(
@@ -379,14 +382,24 @@ async def open_create_variable_modal(
         }
 
         from screens.editor.components.column import EditableColumn
+        from screens.editor.components.boolean_column import BooleanColumn
 
-        new_col = EditableColumn(
-            pool=pool,
-            current_name=var_name,
-            on_change=on_column_data_changed,
-            available_vars_getter=get_available_vars,
-            themes=themes,
-        )
+        if is_boolean_type(var_type):
+            new_col = BooleanColumn(
+                pool=pool,
+                current_name=var_name,
+                on_change=on_column_data_changed,
+                available_vars_getter=get_available_vars,
+                themes=themes,
+            )
+        else:
+            new_col = EditableColumn(
+                pool=pool,
+                current_name=var_name,
+                on_change=on_column_data_changed,
+                available_vars_getter=get_available_vars,
+                themes=themes,
+            )
 
         controls = columns_row.controls
         if controls and getattr(controls[-1], "data", None) == "add_button":
@@ -419,7 +432,9 @@ async def open_create_variable_modal(
                 step1,
             ],
             actions=[
-                text_btn(tm.translate("Cancelar"), on_click=lambda _: page.pop_dialog()),
+                text_btn(
+                    tm.translate("Cancelar"), on_click=lambda _: page.pop_dialog()
+                ),
                 back_btn,
                 next_btn,
                 create_btn,

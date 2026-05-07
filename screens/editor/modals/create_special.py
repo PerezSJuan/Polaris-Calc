@@ -1,9 +1,9 @@
 """
-Modal: Crear fórmula
-Cubre únicamente los tipos de fórmula:
-  · Fórmula sin error
-  · Fórmula con error
-La fórmula es obligatoria; las unidades se derivan automáticamente.
+Modal: Datos especiales
+Permite crear tipos booleanos:
+  · Booleano (Constante)
+  · Columna de booleanos
+  · Función booleana (Fórmula)
 """
 
 import flet as ft
@@ -13,9 +13,8 @@ from flet_base.components.modals import modal
 from flet_base.components.buttons import text_btn, filled_btn
 from screens.editor.components.latex_dropdown import get_latex_widget
 from utils.variable_types import (
-    VARIABLE_TYPE_FORMULA_NO_ERROR,
-    VARIABLE_TYPE_FORMULA_WITH_ERROR,
-    VARIABLE_TYPE_BOOLEAN_FORMULA,
+    VARIABLE_TYPE_BOOLEAN,
+    VARIABLE_TYPE_BOOLEAN_COLUMN,
     VARIABLE_TYPE_LABELS,
     is_boolean_type,
 )
@@ -26,14 +25,8 @@ from screens.editor.modals.utils import (
     _parse_name_unit,
 )
 
-_FORMULA_TYPES = [
-    VARIABLE_TYPE_FORMULA_NO_ERROR,
-    VARIABLE_TYPE_FORMULA_WITH_ERROR,
-    VARIABLE_TYPE_BOOLEAN_FORMULA,
-]
 
-
-async def open_create_formula_modal(
+async def open_create_special_modal(
     page,
     pool,
     columns_row,
@@ -44,17 +37,23 @@ async def open_create_formula_modal(
     themes,
 ):
     t = themes.actual_theme
-    acc = t.get("formula_accent", t["primary"])
+    acc = t["primary"]
 
     # ── Campos ────────────────────────────────────────────────────────────────
     name_field = text_input(
-        placeholder=tm.translate("Nombre variable (ej: F, E_total...)")
+        placeholder=tm.translate("Nombre variable (ej: b1, b_alt...)")
     )
     desc_field = text_input(
         placeholder=tm.translate("Descripción (opcional)"),
         multiline=True,
         max_lines=3,
     )
+
+    _SPECIAL_TYPES = [
+        VARIABLE_TYPE_BOOLEAN,
+        VARIABLE_TYPE_BOOLEAN_COLUMN,
+    ]
+
     type_dropdown = dropdown(
         label=tm.translate("Tipo"),
         options=[
@@ -62,12 +61,9 @@ async def open_create_formula_modal(
                 key=vt,
                 text=tm.translate(VARIABLE_TYPE_LABELS.get(vt, vt)),
             )
-            for vt in _FORMULA_TYPES
+            for vt in _SPECIAL_TYPES
         ],
-        value=VARIABLE_TYPE_FORMULA_NO_ERROR,
-    )
-    formula_field = text_input(
-        placeholder=tm.translate("Fórmula (ej: A * B + C)"),
+        value=VARIABLE_TYPE_BOOLEAN,
     )
 
     # ── Preview LaTeX ─────────────────────────────────────────────────────────
@@ -98,7 +94,7 @@ async def open_create_formula_modal(
             preview_container.visible = False
             try:
                 preview_container.update()
-            except RuntimeError:
+            except:
                 pass
             return
         has_special = any(c in name for c in ("^", "_", "\\"))
@@ -108,31 +104,10 @@ async def open_create_formula_modal(
         preview_container.visible = True
         try:
             preview_container.update()
-        except RuntimeError:
+        except:
             pass
 
     name_field.on_change = lambda e: _refresh_preview()
-
-    # ── Aviso de unidades automáticas ─────────────────────────────────────────
-    units_notice = ft.Container(
-        content=ft.Row(
-            [
-                ft.Icon(ft.Icons.INFO_OUTLINE_ROUNDED, size=13, color=_c(0.40)),
-                ft.Text(
-                    tm.translate(
-                        "Unidades calculadas automáticamente a partir de la fórmula."
-                    ),
-                    size=11,
-                    color=_c(0.45),
-                ),
-            ],
-            spacing=6,
-        ),
-        bgcolor=_c(0.03),
-        border_radius=7,
-        padding=ft.Padding(10, 6, 10, 6),
-        border=ft.Border.all(1, _c(0.07)),
-    )
 
     # ── Banner de error ───────────────────────────────────────────────────────
     error_text_ctrl = ft.Text("", size=12, color=t["error"])
@@ -156,55 +131,22 @@ async def open_create_formula_modal(
         error_banner.visible = True
         try:
             error_banner.update()
-        except RuntimeError:
+        except:
             pass
 
     def _hide_error():
         error_banner.visible = False
         try:
             error_banner.update()
-        except RuntimeError:
+        except:
             pass
-
-    def on_name_blur(e):
-        raw = name_field.value or ""
-        var_name, _ = _parse_name_unit(raw)
-        name_field.value = var_name
-        try:
-            name_field.update()
-        except RuntimeError:
-            pass
-        _refresh_preview()
-
-    name_field.on_blur = on_name_blur
-
-    # ── Contenido único (sin pasos) ───────────────────────────────────────────
-    content_column = ft.Container(
-        content=ft.Column(
-            [
-                _section_header(tm.translate("Identificación")),
-                _card(name_field, preview_container),
-                _section_header(tm.translate("Descripción")),
-                _card(desc_field),
-                _section_header(tm.translate("Tipo de fórmula")),
-                _card(type_dropdown),
-                _section_header(tm.translate("Fórmula")),
-                _card(formula_field, units_notice),
-            ],
-            spacing=0,
-            expand=True,
-            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-        ),
-        expand=True,
-    )
 
     # ── Guardar ───────────────────────────────────────────────────────────────
     def _save(e):
         _hide_error()
         raw_name = name_field.value.strip()
         var_name, _ = _parse_name_unit(raw_name)
-        var_type = type_dropdown.value or VARIABLE_TYPE_FORMULA_NO_ERROR
-        formula = (formula_field.value or "").strip()
+        var_type = type_dropdown.value
 
         if not var_name:
             _show_error(tm.translate("El nombre no puede estar vacío."))
@@ -212,18 +154,15 @@ async def open_create_formula_modal(
         if var_name in pool:
             _show_error(tm.translate("Ya existe una variable con ese nombre."))
             return
-        if not formula:
-            _show_error(tm.translate("Debes ingresar una fórmula."))
-            return
 
         pool[var_name] = {
-            "values": [],
+            "values": [False] if var_type == VARIABLE_TYPE_BOOLEAN else [],
             "errors": [],
             "type": var_type,
             "magnitude": "none",
             "unit": "none",
             "description": desc_field.value.strip(),
-            "formula": formula,
+            "formula": "",
         }
 
         from screens.editor.components.column import EditableColumn
@@ -257,31 +196,36 @@ async def open_create_formula_modal(
 
         try:
             columns_row.update()
-        except RuntimeError:
+        except:
             pass
 
         page.pop_dialog()
         try:
             page.update()
-        except Exception:
+        except:
             pass
 
-    # ── Botón crear ───────────────────────────────────────────────────────────
-    create_btn = filled_btn(
-        tm.translate("Crear fórmula"),
-        on_click=_save,
-    )
     # ── Mostrar modal ─────────────────────────────────────────────────────────
     page.show_dialog(
         modal(
-            title_str=tm.translate("Nueva fórmula"),
+            title_str=tm.translate("Datos especiales (Booleanos)"),
             content=[
                 error_banner,
-                content_column,
+                ft.Column(
+                    [
+                        _section_header(tm.translate("Identificación")),
+                        _card(name_field, preview_container),
+                        _section_header(tm.translate("Descripción")),
+                        _card(desc_field),
+                        _section_header(tm.translate("Tipo")),
+                        _card(type_dropdown),
+                    ],
+                    spacing=0,
+                ),
             ],
             actions=[
                 text_btn(tm.translate("Cancelar"), on_click=lambda _: page.pop_dialog()),
-                create_btn,
+                filled_btn(tm.translate("Crear"), on_click=_save),
             ],
         )
     )

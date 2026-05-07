@@ -156,6 +156,9 @@ def check_dimensions(expr: sp.Expr, variables: dict) -> str:
 
             return f"{base_unit}^{exp_str}"
 
+        elif isinstance(node, (sp.GreaterThan, sp.LessThan, sp.StrictGreaterThan, sp.StrictLessThan, sp.Equality, sp.Unequality)):
+            return "bool"
+
         else:
             raise TypeError(f"Unsupported node type in dimensional check: {type(node)}")
 
@@ -206,18 +209,22 @@ def evaluate(
 
             return val, unit
 
-        elif isinstance(node, sp.Pow):
-            val, unit = _eval(node.args[0])
-            exp = float(node.args[1])
-
-            if unit == "1":
-                return val**exp, "1"
-
-            exp_str = str(exp)
-            if exp.is_integer():
-                exp_str = str(int(exp))
-
             return val**exp, f"{unit}^{exp_str}"
+        
+        elif isinstance(node, (sp.GreaterThan, sp.LessThan, sp.StrictGreaterThan, sp.StrictLessThan, sp.Equality, sp.Unequality)):
+            lhs_val, _ = _eval(node.lhs)
+            rhs_val, _ = _eval(node.rhs)
+            
+            # Simple numeric comparison
+            if isinstance(node, sp.GreaterThan): res = lhs_val >= rhs_val
+            elif isinstance(node, sp.LessThan): res = lhs_val <= rhs_val
+            elif isinstance(node, sp.StrictGreaterThan): res = lhs_val > rhs_val
+            elif isinstance(node, sp.StrictLessThan): res = lhs_val < rhs_val
+            elif isinstance(node, sp.Equality): res = lhs_val == rhs_val
+            elif isinstance(node, sp.Unequality): res = lhs_val != rhs_val
+            else: res = False
+            
+            return (1.0 if res else 0.0), "bool"
 
         else:
             raise TypeError(f"Unsupported node type in evaluation: {type(node)}")

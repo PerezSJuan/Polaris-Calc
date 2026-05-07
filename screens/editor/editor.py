@@ -21,17 +21,21 @@ from function_substitution import CONSTANTS, evaluate, parse_expression
 from screens.editor.utils.utils import normalize_editor_data
 from screens.editor.components.column import EditableColumn
 from screens.editor.components.plot_column import PlotColumn
+from screens.editor.components.boolean_column import BooleanColumn
 from utils.variable_types import (
     VARIABLE_TYPE_COLUMN_NO_ERROR,
     VARIABLE_TYPE_FORMULA_WITH_ERROR,
+    VARIABLE_TYPE_BOOLEAN_FORMULA,
     infer_variable_type,
     is_formula_type,
     is_plot_type,
+    is_boolean_type,
 )
 from screens.editor.modals import (
     open_create_variable_modal,
     open_create_formula_modal,
     open_create_plot_modal,
+    open_create_special_modal,
     open_rename_tab_modal,
     open_variable_settings_modal,
 )
@@ -124,14 +128,18 @@ async def EditorScreen(data: fr.DataSystem, themes):
     def get_available_vars():
         return list(pool.keys())
 
-    def _visible_columns() -> list[EditableColumn]:
-        return [c for c in columns_row.controls if isinstance(c, EditableColumn)]
+    def _visible_columns() -> list:
+        return [
+            c
+            for c in columns_row.controls
+            if isinstance(c, (EditableColumn, BooleanColumn))
+        ]
 
     def _visible_column_names() -> set[str]:
         """Returns names of all visible columns, including PlotColumns."""
         names = set()
         for c in columns_row.controls:
-            if isinstance(c, EditableColumn):
+            if isinstance(c, (EditableColumn, BooleanColumn)):
                 names.add(c.current_name)
             elif isinstance(c, PlotColumn):
                 names.add(c.plot_name)
@@ -140,7 +148,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
     def _all_named_columns() -> list[str]:
         result = []
         for c in columns_row.controls:
-            if isinstance(c, EditableColumn):
+            if isinstance(c, (EditableColumn, BooleanColumn)):
                 result.append(c.current_name)
             elif isinstance(c, PlotColumn):
                 result.append(c.plot_name)
@@ -245,7 +253,10 @@ async def EditorScreen(data: fr.DataSystem, themes):
                 )
 
             value, unit = evaluate(formula, variables, mode="auto")
-            result_values.append(float(value))
+            if variable_type == VARIABLE_TYPE_BOOLEAN_FORMULA:
+                result_values.append(bool(value))
+            else:
+                result_values.append(float(value))
             result_unit = _normalize_unit_for_pool(unit)
 
         return result_values, result_unit
@@ -309,11 +320,20 @@ async def EditorScreen(data: fr.DataSystem, themes):
             return False
 
     def _make_column(name: str) -> ft.Control:
-        if is_plot_type(infer_variable_type(pool.get(name, {}))):
+        vt = infer_variable_type(pool.get(name, {}))
+        if is_plot_type(vt):
             return PlotColumn(
                 pool=pool,
                 plot_name=name,
                 on_change=on_column_data_changed,
+                themes=themes,
+            )
+        if is_boolean_type(vt):
+            return BooleanColumn(
+                pool=pool,
+                current_name=name,
+                on_change=on_column_data_changed,
+                available_vars_getter=get_available_vars,
                 themes=themes,
             )
         return EditableColumn(
@@ -348,7 +368,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
         recalculate_derived_variables(show_errors=True)
         update_shared_state()
         for c in columns_row.controls:
-            if isinstance(c, (EditableColumn, PlotColumn)):
+            if isinstance(c, (EditableColumn, PlotColumn, BooleanColumn)):
                 c.sync_with_pool()
                 c._just_changed = False
         _update_add_column_menu_items()
@@ -537,6 +557,20 @@ async def EditorScreen(data: fr.DataSystem, themes):
         )
 
     data.shared["open_create_plot_modal"] = trigger_create_plot_modal
+
+    async def trigger_create_special_modal(e=None):
+        await open_create_special_modal(
+            page=data.page,
+            pool=pool,
+            columns_row=columns_row,
+            on_column_data_changed=on_column_data_changed,
+            get_available_vars=get_available_vars,
+            refresh_all_dropdowns=refresh_all_dropdowns,
+            update_shared_state=update_shared_state,
+            themes=themes,
+        )
+
+    data.shared["open_create_special_modal"] = trigger_create_special_modal
 
     # ------------------------------------------------------------------
     # Static Elements

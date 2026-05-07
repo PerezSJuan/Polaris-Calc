@@ -3,7 +3,23 @@ import os
 from utils.variable_types import (
     VARIABLE_TYPE_COLUMN_NO_ERROR,
     infer_variable_type,
+    is_boolean_type,
 )
+
+
+def _coerce_bool(val) -> bool:
+    """Normalise any truthy/falsy representation to a proper Python bool.
+
+    Handles: actual bool, int/float (0 → False, anything else → True),
+    and strings like "True", "true", "1", "False", "false", "0".
+    """
+    if isinstance(val, bool):
+        return val
+    if isinstance(val, (int, float)):
+        return bool(val)
+    if isinstance(val, str):
+        return val.strip().lower() in ("true", "1", "yes")
+    return False
 
 
 def _normalize_columns(raw_data):
@@ -34,8 +50,19 @@ def _normalize_columns(raw_data):
             description = col.get("description", "")
             formula = col.get("formula", "")
             var_type = infer_variable_type(col)
+            if is_boolean_type(var_type):
+                values = [_coerce_bool(v) for v in values]
         elif isinstance(col, list):
-            name, values, normalized_errors, var_type, magnitude, unit, description, formula = (
+            (
+                name,
+                values,
+                normalized_errors,
+                var_type,
+                magnitude,
+                unit,
+                description,
+                formula,
+            ) = (
                 f"V{i + 1}",
                 col,
                 [],
@@ -48,27 +75,31 @@ def _normalize_columns(raw_data):
         else:
             continue
 
-        columns.append({
-            "name": str(name),
-            "values": values,
-            "errors": normalized_errors,
-            "type": var_type,
-            "magnitude": magnitude,
-            "unit": unit,
-            "description": description,
-            "formula": formula,
-        })
+        columns.append(
+            {
+                "name": str(name),
+                "values": values,
+                "errors": normalized_errors,
+                "type": var_type,
+                "magnitude": magnitude,
+                "unit": unit,
+                "description": description,
+                "formula": formula,
+            }
+        )
 
-    return columns or [{
-        "name": "V1",
-        "values": [],
-        "errors": [],
-        "type": VARIABLE_TYPE_COLUMN_NO_ERROR,
-        "magnitude": "none",
-        "unit": "none",
-        "description": "",
-        "formula": "",
-    }]
+    return columns or [
+        {
+            "name": "V1",
+            "values": [],
+            "errors": [],
+            "type": VARIABLE_TYPE_COLUMN_NO_ERROR,
+            "magnitude": "none",
+            "unit": "none",
+            "description": "",
+            "formula": "",
+        }
+    ]
 
 
 def _normalize_layout(layout, columns_data):

@@ -131,6 +131,11 @@ def create_topbar(
         if trigger:
             await trigger(e)
 
+    async def handle_trigger_create_special(e):
+        trigger = shared.get("open_create_special_modal") if shared is not None else None
+        if trigger:
+            await trigger(e)
+
     async def handle_change_theme(e):
         await change_theme(page)
 
@@ -233,6 +238,13 @@ def create_topbar(
                             ),
                             disabled=page.route != "/editor",
                             on_click=handle_trigger_create_plot,
+                        ),
+                        ft.MenuItemButton(
+                            content=ft.Text(
+                                translation_manager.translate("Datos especiales")
+                            ),
+                            disabled=page.route != "/editor",
+                            on_click=handle_trigger_create_special,
                         ),
                     ],
                 ),

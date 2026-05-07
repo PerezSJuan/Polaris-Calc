@@ -6,7 +6,11 @@ from flet_base.components.inputs import dropdown
 from screens.editor.components.latex_dropdown import latex_dropdown, get_latex_widget
 from screens.editor.modals import open_variable_settings_modal
 
-from screens.editor.utils.utils import load_default_units, load_number_unit_parser, load_smart_format
+from screens.editor.utils.utils import (
+    load_default_units,
+    load_number_unit_parser,
+    load_smart_format,
+)
 
 _evaluate_expr = load_number_unit_parser()
 _smart_format = load_smart_format()
@@ -42,11 +46,15 @@ def _type_accent(var_type: str, themes) -> str:
         return t.get("constant_accent", t["secondary"])
     if "error" in vt:
         return t.get("error_accent", t["error"])
+    if "bool" in vt:
+        is_dark = t.get("background") == themes.dark_theme.get("background")
+        return ft.Colors.TEAL_400 if not is_dark else ft.Colors.TEAL_200
     return t["primary"]
 
 
 def _fmt(v: float) -> str:
     import math
+
     if not math.isfinite(v):
         return str(v)  # "inf", "-inf", "nan"
     # Use a larger budget (12) for the UI to avoid premature rounding/scientific notation
@@ -58,6 +66,7 @@ def _fmt(v: float) -> str:
 def _fmt_edit(v: float) -> str:
     """Format for editing: show full number unless it is extremely large."""
     import math
+
     if not math.isfinite(v):
         return str(v)
     if abs(v) >= 1e20:
@@ -688,9 +697,9 @@ class EditableColumn(ft.Container):
             return
         error_value = errors[0] if errors else ""
         new_value = _fmt(error_value) if isinstance(error_value, (int, float)) else ""
-        
+
         # Don't overwrite if this specific cell or its parent is focused
-        is_focused = (self.global_error_field.edit_field is self._focused_cell)
+        is_focused = self.global_error_field.edit_field is self._focused_cell
         if not is_focused:
             self.global_error_field.value = new_value
         self.global_error_field.read_only = self._is_derived()
@@ -800,15 +809,16 @@ class EditableColumn(ft.Container):
         del rows[target_len:]
         for idx, row in enumerate(rows):
             value_cell, error_cell = self._extract_row_cells(row)
-            
+
             # Update Value Cell
             if value_cell is not None:
                 next_value = _fmt(values[idx]) if idx < len(values) else ""
+
                 # Skip if this cell's editor is focused
                 if value_cell.edit_field is not self._focused_cell:
                     if value_cell.value != next_value:
                         value_cell.value = next_value
-            
+
             # Update Error Cell
             if error_cell is not None:
                 next_error = _fmt(errors[idx]) if idx < len(errors) else ""
