@@ -12,11 +12,12 @@ from utils.variable_types import (
 )
 
 # ── Design tokens ──────────────────────────────────────────────────────────────
-_CARD_W = 180
+_CARD_W = 245
 _PADDING = 15
 _CARD_RADIUS = 12
-_CELL_H = 38
-_CELL_RADIUS = 10
+_CELL_H = 35
+_CELL_RADIUS = 6
+_BTN_SPACE = 30
 
 
 def _c(t, key, opacity=1.0):
@@ -70,7 +71,7 @@ class BooleanCell(ft.Container):
     def _update_style(self, hovered=False):
         t = self.themes.actual_theme
         is_dark = t.get("background") == self.themes.dark_theme.get("background")
-        acc = ft.Colors.TEAL_400 if not is_dark else ft.Colors.TEAL_300
+        acc = ft.Colors.TEAL_400 if not is_dark else ft.Colors.TEAL_200
 
         if self.value_bool:
             self.bgcolor = acc if not hovered else ft.Colors.with_opacity(0.8, acc)
@@ -147,13 +148,13 @@ class BooleanColumn(ft.Container):
     def _build_ui(self):
         t = self.themes.actual_theme
         is_dark = t.get("background") == self.themes.dark_theme.get("background")
-        acc = ft.Colors.TEAL_400 if not is_dark else ft.Colors.TEAL_300
+        acc = ft.Colors.TEAL_400 if not is_dark else ft.Colors.TEAL_200
 
         self._accent_strip = ft.Container(
-            height=4,
+            height=3,
             bgcolor=acc,
             border_radius=ft.BorderRadius(
-                top_left=12, top_right=12, bottom_left=0, bottom_right=0
+                top_left=_CARD_RADIUS, top_right=_CARD_RADIUS, bottom_left=0, bottom_right=0
             ),
         )
 
@@ -162,12 +163,12 @@ class BooleanColumn(ft.Container):
         _header = ft.Container(
             content=ft.Row(
                 [
-                    ft.Icon(ft.Icons.CHECK_BOX_OUTLINED, size=20, color=acc),
+                    ft.Icon(ft.Icons.CHECK_BOX_OUTLINED, size=18, color=acc),
                     self.header_display,
                 ],
-                spacing=8,
+                spacing=5,
             ),
-            padding=ft.Padding(15, 12, 15, 8),
+            padding=ft.Padding(left=_PADDING, top=10, right=6, bottom=6),
         )
 
         self.formula_badge = ft.Container(
@@ -200,11 +201,11 @@ class BooleanColumn(ft.Container):
         )
 
         self.add_row_btn = ft.IconButton(
-            icon=ft.Icons.ADD_ROUNDED,
-            icon_size=20,
-            tooltip=tm.translate("Añadir"),
+            icon=ft.Icons.ADD_CIRCLE_OUTLINE,
+            icon_size=24,
+            tooltip=tm.translate("Agregar fila"),
             on_click=self._add_row,
-            icon_color=acc,
+            icon_color=t["primary"],
         )
 
         self._load_rows()
@@ -228,13 +229,15 @@ class BooleanColumn(ft.Container):
                 ),
                 ft.Container(
                     content=self.rows_col,
-                    padding=ft.Padding(15, 5, 15, 15),
+                    padding=ft.Padding(left=_PADDING, right=_PADDING, top=0, bottom=15),
                     expand=True,
                 ),
                 self._stats_container,
                 ft.Container(
-                    content=self.add_row_btn,
-                    padding=ft.Padding(15, 5, 15, 10),
+                    content=ft.Row(
+                        [self.add_row_btn], alignment=ft.MainAxisAlignment.CENTER
+                    ),
+                    padding=ft.Padding(0, 4, 0, 8),
                 ),
             ],
             spacing=0,
@@ -335,16 +338,18 @@ class BooleanColumn(ft.Container):
                 btn,
                 ft.IconButton(
                     icon=ft.Icons.DELETE_OUTLINE_ROUNDED,
-                    icon_size=16,
+                    icon_size=13,
+                    width=22,
+                    height=22,
                     padding=0,
-                    visual_density=ft.VisualDensity.COMPACT,
-                    icon_color=ft.Colors.with_opacity(
-                        0.2, self.themes.actual_theme["on_surface"]
-                    ),
+                    tooltip=tm.translate("Eliminar fila"),
                     on_click=lambda _: self._remove_row(btn),
+                    opacity=0.4,
+                    icon_color=ft.Colors.RED_400,
                 ),
             ],
             spacing=5,
+            alignment=ft.MainAxisAlignment.END,
         )
 
     def _remove_row(self, btn):
@@ -361,8 +366,10 @@ class BooleanColumn(ft.Container):
             pass
 
     def _apply_derived_state(self):
-        is_readonly = self._is_derived() or is_constant_type(self._var_type())
-        self.add_row_btn.visible = not is_readonly
+        t = self.themes.actual_theme
+        block = self._is_derived() or is_constant_type(self._var_type())
+        self.add_row_btn.disabled = block
+        self.add_row_btn.icon_color = _c(t, "primary", 0.30) if block else t["primary"]
         try:
             self.add_row_btn.update()
         except:

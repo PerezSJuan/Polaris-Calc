@@ -25,11 +25,12 @@ from utils.variable_types import (
 default_units = load_default_units()
 
 # ── Design tokens ──────────────────────────────────────────────────────────────
-_CARD_W = 180
+_CARD_W = 245
 _PADDING = 15
 _CARD_RADIUS = 12
 _CELL_H = 35
 _CELL_RADIUS = 6
+_BTN_SPACE = 30  # Space for delete button
 
 
 def _c(t, key, opacity=1.0):
@@ -93,6 +94,7 @@ class LatexCell(ft.Stack):
         compact=False,
         read_only=False,
         is_error=False,
+        on_delete=None,
     ):
         super().__init__()
         self.value_num = value if isinstance(value, (int, float)) else 0.0
@@ -100,18 +102,22 @@ class LatexCell(ft.Stack):
         self._on_change_cb = on_change
         self._on_focus_cb = on_focus
         self._on_blur_cb = on_blur
+        self._on_delete_cb = on_delete
         self.compact = compact
         self.read_only = read_only
         self.is_error = is_error
 
-        self.width = 88 if compact else (58 if is_error else None)
+        # Width logic: keep the content area the same as before (88/58)
+        # but add space for buttons.
+        base_w = 88 if compact else (58 if is_error else None)
+        self.width = base_w + _BTN_SPACE if base_w else None
         self.height = _CELL_H
 
         # 1. TextField for editing
         self.edit_field = ft.TextField(
             value=_fmt_edit(self.value_num),
             dense=True,
-            width=self.width,
+            width=base_w,  # Keep original width for content
             height=_CELL_H,
             text_align=ft.TextAlign.RIGHT,
             on_change=self._on_text_change,
@@ -132,16 +138,54 @@ class LatexCell(ft.Stack):
                 [get_latex_widget(self._get_display_str(), size=13)],
                 alignment=ft.MainAxisAlignment.END,
             ),
+            width=base_w,  # Keep original width for content
             padding=ft.Padding.symmetric(horizontal=10),
             on_click=self._on_display_click,
             bgcolor=self._cell_bg_color(),
             border_radius=_CELL_RADIUS,
-            expand=True,
+            # expand=True if not base_w else False, # Removed expand to respect fixed width if present
             height=_CELL_H,
             visible=True,
         )
 
-        self.controls = [self.display_container, self.edit_field]
+        # 3. Buttons Row
+        self.delete_btn = ft.IconButton(
+            icon=ft.Icons.DELETE_OUTLINE_ROUNDED,
+            icon_size=13,
+            width=22,
+            height=22,
+            padding=0,
+            tooltip=tm.translate("Eliminar fila"),
+            on_click=self._on_delete_click,
+            opacity=0.4,
+            icon_color=ft.Colors.RED_400,
+            visible=on_delete is not None and not read_only,
+        )
+
+        self.buttons_row = ft.Row(
+            [self.delete_btn],
+            spacing=0,
+            alignment=ft.MainAxisAlignment.END,
+            visible=True,
+        )
+
+        # Content area (Stack of display/edit)
+        self.content_stack = ft.Stack(
+            [self.display_container, self.edit_field],
+            expand=True if not base_w else False,
+            width=base_w,
+        )
+
+        self.controls = [
+            ft.Row(
+                [
+                    self.content_stack,
+                    self.buttons_row,
+                ],
+                alignment=ft.MainAxisAlignment.END,
+                spacing=5,
+            )
+        ]
 
     @property
     def value(self):
@@ -230,6 +274,13 @@ class LatexCell(ft.Stack):
                 await self._on_change_cb(e)
             else:
                 self._on_change_cb(e)
+
+    async def _on_delete_click(self, e):
+        if self._on_delete_cb:
+            if asyncio.iscoroutinefunction(self._on_delete_cb):
+                await self._on_delete_cb(e)
+            else:
+                self._on_delete_cb(e)
 
 
 class EditableColumn(ft.Container):
@@ -629,6 +680,7 @@ class EditableColumn(ft.Container):
             on_change=self._on_cell_change,
             on_focus=self._on_cell_focus,
             on_blur=self._on_cell_blur,
+            on_delete=self._delete_row_callback,
         )
 
     def _make_error_cell(self, value=""):
@@ -640,6 +692,7 @@ class EditableColumn(ft.Container):
             on_change=self._on_cell_change,
             on_focus=self._on_cell_focus,
             on_blur=self._on_cell_blur,
+            on_delete=self._delete_row_callback,
         )
 
     def _make_row(self, value="", error=""):
@@ -653,6 +706,44 @@ class EditableColumn(ft.Container):
                 alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
             )
         return self._make_value_cell(value=value)
+
+    def _delete_row_callback(self, e):
+        # Find which row control contained the clicked cell and delete it.
+        btn = e.control
+        target_row = None
+        for r in self.rows_col.controls:
+            # If r is LatexCell, it is the target
+            if r is btn or (
+                isinstance(r, LatexCell) and r.delete_btn is btn
+            ):
+                target_row = r
+                break
+            # If r is Row, check children
+            if isinstance(r, ft.Row):
+                for child in r.controls:
+                    if child is btn or (
+                        isinstance(child, LatexCell) and child.delete_btn is btn
+                    ):
+                        target_row = r
+                        break
+            if target_row:
+                break
+
+        if target_row:
+            asyncio.create_task(self._delete_row(target_row))
+
+    async def _delete_row(self, row_control):
+        if row_control in self.rows_col.controls:
+            self.rows_col.controls.remove(row_control)
+            if not self.rows_col.controls:
+                self.rows_col.controls.append(self._make_row())
+
+            self.sync_pool()
+            self._notify_change()
+            try:
+                await self.rows_col.update()
+            except:
+                pass
 
     @staticmethod
     def _extract_row_cells(row):
