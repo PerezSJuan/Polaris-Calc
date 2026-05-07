@@ -119,7 +119,15 @@ class BooleanColumn(ft.Container):
     A column card specialized for boolean data, rendered as a list of buttons.
     """
 
-    def __init__(self, pool, current_name, on_change, available_vars_getter, themes):
+    def __init__(
+        self,
+        pool,
+        current_name,
+        on_change,
+        available_vars_getter,
+        themes,
+        on_manage=None,
+    ):
         super().__init__()
         self.pool = pool
         self.current_name = current_name
@@ -127,6 +135,7 @@ class BooleanColumn(ft.Container):
         self.available_vars_getter = available_vars_getter
         self.themes = themes
         self._just_changed = False
+        self._on_manage_cb = on_manage
 
         t = themes.actual_theme
         self.width = _CARD_W
@@ -160,13 +169,67 @@ class BooleanColumn(ft.Container):
 
         self.header_display = txt.markdown(self._get_latex_header(), size=15)
 
+        self.move_left_btn = ft.IconButton(
+            icon=ft.Icons.ARROW_BACK_IOS_NEW,
+            icon_size=16,
+            padding=ft.Padding.all(4),
+            tooltip=tm.translate("Mover a la izquierda"),
+            on_click=lambda e: asyncio.create_task(self._on_manage_click("move_left", e)),
+            icon_color=_c(t, "on_surface", 0.65),
+            visible=self._on_manage_cb is not None,
+        )
+        self.move_right_btn = ft.IconButton(
+            icon=ft.Icons.ARROW_FORWARD_IOS,
+            icon_size=16,
+            padding=ft.Padding.all(4),
+            tooltip=tm.translate("Mover a la derecha"),
+            on_click=lambda e: asyncio.create_task(self._on_manage_click("move_right", e)),
+            icon_color=_c(t, "on_surface", 0.65),
+            visible=self._on_manage_cb is not None,
+        )
+        self.remove_from_tab_btn = ft.IconButton(
+            icon=ft.Icons.REMOVE_CIRCLE_OUTLINE,
+            icon_size=16,
+            padding=ft.Padding.all(4),
+            tooltip=tm.translate("Eliminar de la pestaña"),
+            on_click=lambda e: asyncio.create_task(self._on_manage_click("remove_from_tab", e)),
+            icon_color=_c(t, "on_surface", 0.65),
+            visible=self._on_manage_cb is not None,
+        )
+        self.delete_variable_btn = ft.IconButton(
+            icon=ft.Icons.DELETE_OUTLINE_ROUNDED,
+            icon_size=16,
+            padding=ft.Padding.all(4),
+            tooltip=tm.translate("Eliminar variable"),
+            on_click=lambda e: asyncio.create_task(self._on_manage_click("delete_variable", e)),
+            icon_color=ft.Colors.RED_400,
+            visible=self._on_manage_cb is not None,
+        )
+        self.manage_btns = ft.Row(
+            [
+                self.move_left_btn,
+                self.move_right_btn,
+                self.remove_from_tab_btn,
+                self.delete_variable_btn,
+            ],
+            spacing=2,
+            visible=self._on_manage_cb is not None,
+        )
+
         _header = ft.Container(
             content=ft.Row(
                 [
-                    ft.Icon(ft.Icons.CHECK_BOX_OUTLINED, size=18, color=acc),
-                    self.header_display,
+                    ft.Row(
+                        [
+                            ft.Icon(ft.Icons.CHECK_BOX_OUTLINED, size=18, color=acc),
+                            self.header_display,
+                        ],
+                        spacing=5,
+                        expand=True,
+                    ),
+                    self.manage_btns,
                 ],
-                spacing=5,
+                spacing=8,
             ),
             padding=ft.Padding(left=_PADDING, top=10, right=6, bottom=6),
         )
@@ -243,6 +306,14 @@ class BooleanColumn(ft.Container):
             spacing=0,
             expand=True,
         )
+
+    async def _on_manage_click(self, action, e):
+        if not self._on_manage_cb:
+            return
+        if asyncio.iscoroutinefunction(self._on_manage_cb):
+            await self._on_manage_cb(self.current_name, action)
+        else:
+            self._on_manage_cb(self.current_name, action)
 
     def _build_stats_row(self):
         t = self.themes.actual_theme

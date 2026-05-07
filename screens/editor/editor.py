@@ -7,7 +7,8 @@ import flet as ft
 import flet_base.router as fr
 from flet_base.translations import instance_translation_manager as tm
 
-from flet_base.components.buttons import icon_btn
+from flet_base.components.buttons import icon_btn, filled_btn, text_btn
+from flet_base.components.modals import modal
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 math_utils_path = os.path.abspath(
@@ -261,6 +262,80 @@ async def EditorScreen(data: fr.DataSystem, themes):
 
         return result_values, result_unit
 
+    def _move_column_in_current_tab(variable_name: str, direction: int):
+        curr = _current_tab()
+        if curr.get("id") == "fixed_summary":
+            return
+        columns = curr.get("columns", [])
+        if variable_name not in columns:
+            return
+        src_idx = columns.index(variable_name)
+        dest_idx = src_idx + direction
+        if dest_idx < 0 or dest_idx >= len(columns):
+            return
+        columns[src_idx], columns[dest_idx] = columns[dest_idx], columns[src_idx]
+        curr["columns"] = columns
+        _refresh_ui()
+        update_shared_state()
+
+    def _remove_column_from_current_tab(variable_name: str):
+        curr = _current_tab()
+        if curr.get("id") == "fixed_summary":
+            return
+        if variable_name in curr.get("columns", []):
+            curr["columns"].remove(variable_name)
+            _refresh_ui()
+            update_shared_state()
+
+    def _delete_variable(variable_name: str):
+        if variable_name not in pool:
+            return
+        pool.pop(variable_name, None)
+        for tab in tabs:
+            tab["columns"] = [c for c in tab.get("columns", []) if c != variable_name]
+        if active_index[0] >= len(tabs):
+            active_index[0] = max(0, len(tabs) - 1)
+        recalculate_derived_variables(show_errors=False)
+        update_shared_state()
+        _refresh_ui()
+
+    async def _confirm_delete_variable(variable_name: str):
+        if variable_name not in pool:
+            return
+
+        def _on_cancel(e):
+            data.page.pop_dialog()
+            try:
+                data.page.update()
+            except Exception:
+                pass
+
+        def _on_confirm(e):
+            _delete_variable(variable_name)
+            data.page.pop_dialog()
+            try:
+                data.page.update()
+            except Exception:
+                pass
+
+        data.page.show_dialog(
+            modal(
+                title_str=tm.translate("Eliminar variable"),
+                content=[
+                    ft.Text(
+                        tm.translate(
+                            "¿Estás seguro de que deseas eliminar esta variable de forma permanente?"
+                        ),
+                        size=14,
+                    )
+                ],
+                actions=[
+                    text_btn(tm.translate("Cancelar"), on_click=_on_cancel),
+                    filled_btn(tm.translate("Eliminar"), on_click=_on_confirm),
+                ],
+            )
+        )
+
     def recalculate_derived_variables(show_errors=True) -> bool:
         derived_names = [name for name in pool if _is_derived(name)]
         if not derived_names:
@@ -319,6 +394,16 @@ async def EditorScreen(data: fr.DataSystem, themes):
                 _show_formula_error(f"Error en variable derivada: {exc}")
             return False
 
+    async def _handle_column_manage(variable_name: str, action: str):
+        if action == "move_left":
+            _move_column_in_current_tab(variable_name, -1)
+        elif action == "move_right":
+            _move_column_in_current_tab(variable_name, 1)
+        elif action == "remove_from_tab":
+            _remove_column_from_current_tab(variable_name)
+        elif action == "delete_variable":
+            await _confirm_delete_variable(variable_name)
+
     def _make_column(name: str) -> ft.Control:
         vt = infer_variable_type(pool.get(name, {}))
         if is_plot_type(vt):
@@ -327,6 +412,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
                 plot_name=name,
                 on_change=on_column_data_changed,
                 themes=themes,
+                on_manage=_handle_column_manage,
             )
         if is_boolean_type(vt):
             return BooleanColumn(
@@ -335,6 +421,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
                 on_change=on_column_data_changed,
                 available_vars_getter=get_available_vars,
                 themes=themes,
+                on_manage=_handle_column_manage,
             )
         return EditableColumn(
             pool=pool,
@@ -342,6 +429,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
             on_change=on_column_data_changed,
             available_vars_getter=get_available_vars,
             themes=themes,
+            on_manage=_handle_column_manage,
         )
 
     # ------------------------------------------------------------------
@@ -409,6 +497,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
                     on_open_settings=lambda name: open_variable_settings_modal(
                         data.page, name, pool, on_column_data_changed, themes
                     ),
+                    on_delete=_confirm_delete_variable,
                 )
             ]
             content_container.content = summary_col
@@ -527,6 +616,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
             refresh_all_dropdowns=refresh_all_dropdowns,
             update_shared_state=update_shared_state,
             themes=themes,
+            on_manage=_handle_column_manage,
         )
 
     async def trigger_create_formula_modal(e=None):
@@ -539,6 +629,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
             refresh_all_dropdowns=refresh_all_dropdowns,
             update_shared_state=update_shared_state,
             themes=themes,
+            on_manage=_handle_column_manage,
         )
 
     data.shared["open_create_variable_modal"] = trigger_create_variable_modal
@@ -554,6 +645,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
             refresh_all_dropdowns=refresh_all_dropdowns,
             update_shared_state=update_shared_state,
             themes=themes,
+            on_manage=_handle_column_manage,
         )
 
     data.shared["open_create_plot_modal"] = trigger_create_plot_modal
@@ -568,6 +660,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
             refresh_all_dropdowns=refresh_all_dropdowns,
             update_shared_state=update_shared_state,
             themes=themes,
+            on_manage=_handle_column_manage,
         )
 
     data.shared["open_create_special_modal"] = trigger_create_special_modal

@@ -45,7 +45,12 @@ def _fmt(v: float) -> str:
 
 
 def _make_card(
-    i: int, name: str, entry: dict, themes, on_open_settings
+    i: int,
+    name: str,
+    entry: dict,
+    themes,
+    on_open_settings,
+    on_delete=None,
 ) -> ft.Container:
     t = getattr(themes, "actual_theme", themes if isinstance(themes, dict) else {})
     values = entry.get("values", [])
@@ -80,15 +85,30 @@ def _make_card(
             ft.Row(
                 [index_badge, get_latex_widget(name, size=17)], spacing=8, expand=True
             ),
-            ft.IconButton(
-                icon=ft.Icons.SETTINGS_OUTLINED,
-                icon_size=16,
-                icon_color=_c(t, "on_surface", 0.35),
-                style=ft.ButtonStyle(padding=ft.Padding.all(2)),
-                on_click=(lambda n: lambda e: on_open_settings(n))(name)
-                if on_open_settings
-                else None,
-                tooltip=tm.translate("Configurar"),
+            ft.Row(
+                [
+                    ft.IconButton(
+                        icon=ft.Icons.SETTINGS_OUTLINED,
+                        icon_size=16,
+                        icon_color=_c(t, "on_surface", 0.35),
+                        style=ft.ButtonStyle(padding=ft.Padding.all(2)),
+                        on_click=(lambda n: lambda e: on_open_settings(n))(name)
+                        if on_open_settings
+                        else None,
+                        tooltip=tm.translate("Configurar"),
+                    ),
+                    ft.IconButton(
+                        icon=ft.Icons.DELETE_OUTLINE_ROUNDED,
+                        icon_size=16,
+                        icon_color=ft.Colors.RED_400,
+                        style=ft.ButtonStyle(padding=ft.Padding.all(2)),
+                        on_click=(lambda n: lambda e: on_delete(n))(name)
+                        if on_delete
+                        else None,
+                        tooltip=tm.translate("Eliminar variable"),
+                    ),
+                ],
+                spacing=2,
             ),
         ],
         alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
@@ -252,7 +272,12 @@ def _make_card(
 
 
 def _make_plot_card(
-    i: int, name: str, entry: dict, themes, on_open_settings
+    i: int,
+    name: str,
+    entry: dict,
+    themes,
+    on_open_settings,
+    on_delete=None,
 ) -> ft.Container:
     t = getattr(themes, "actual_theme", themes if isinstance(themes, dict) else {})
     acc = t.get("formula_accent", t.get("primary", ft.Colors.BLUE))
@@ -301,15 +326,30 @@ def _make_plot_card(
                 spacing=6,
                 expand=True,
             ),
-            ft.IconButton(
-                icon=ft.Icons.SETTINGS_OUTLINED,
-                icon_size=16,
-                icon_color=_c(t, "on_surface", 0.35),
-                style=ft.ButtonStyle(padding=ft.Padding.all(2)),
-                on_click=(lambda n: lambda e: on_open_settings(n))(name)
-                if on_open_settings
-                else None,
-                tooltip=tm.translate("Configurar"),
+            ft.Row(
+                [
+                    ft.IconButton(
+                        icon=ft.Icons.SETTINGS_OUTLINED,
+                        icon_size=16,
+                        icon_color=_c(t, "on_surface", 0.35),
+                        style=ft.ButtonStyle(padding=ft.Padding.all(2)),
+                        on_click=(lambda n: lambda e: on_open_settings(n))(name)
+                        if on_open_settings
+                        else None,
+                        tooltip=tm.translate("Configurar"),
+                    ),
+                    ft.IconButton(
+                        icon=ft.Icons.DELETE_OUTLINE_ROUNDED,
+                        icon_size=16,
+                        icon_color=ft.Colors.RED_400,
+                        style=ft.ButtonStyle(padding=ft.Padding.all(2)),
+                        on_click=(lambda n: lambda e: on_delete(n))(name)
+                        if on_delete
+                        else None,
+                        tooltip=tm.translate("Eliminar variable"),
+                    ),
+                ],
+                spacing=2,
             ),
         ],
         alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
@@ -425,12 +465,16 @@ def _make_plot_card(
     )
 
 
-def SummaryView(pool, themes, on_open_settings=None):
+def SummaryView(pool, themes, on_open_settings=None, on_delete=None):
     t = getattr(themes, "actual_theme", themes if isinstance(themes, dict) else {})
 
     def _handle_open_settings(var_name):
         if on_open_settings:
             asyncio.create_task(on_open_settings(var_name))
+
+    def _handle_delete(var_name):
+        if on_delete:
+            asyncio.create_task(on_delete(var_name))
 
     cards = []
     if isinstance(pool, dict):
@@ -439,11 +483,25 @@ def SummaryView(pool, themes, on_open_settings=None):
                 var_type = infer_variable_type(entry)
                 if is_plot_type(var_type):
                     cards.append(
-                        _make_plot_card(i, name, entry, themes, _handle_open_settings)
+                        _make_plot_card(
+                            i,
+                            name,
+                            entry,
+                            themes,
+                            _handle_open_settings,
+                            _handle_delete,
+                        )
                     )
                 else:
                     cards.append(
-                        _make_card(i, name, entry, themes, _handle_open_settings)
+                        _make_card(
+                            i,
+                            name,
+                            entry,
+                            themes,
+                            _handle_open_settings,
+                            _handle_delete,
+                        )
                     )
             except Exception as e:
                 # Silently skip failed cards but log to console if possible

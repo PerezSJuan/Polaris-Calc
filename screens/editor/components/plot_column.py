@@ -16,6 +16,7 @@ from matplotlib.figure import Figure
 import numpy as np
 import io
 import base64
+import asyncio
 from flet_base.translations import instance_translation_manager as tm
 
 # ── math utils en el path ────────────────────────────────────────────────────
@@ -182,13 +183,21 @@ class PlotColumn(ft.Container):
     Renderiza la figura con ft.MatplotlibChart.
     """
 
-    def __init__(self, pool: dict, plot_name: str, on_change, themes):
+    def __init__(
+        self,
+        pool: dict,
+        plot_name: str,
+        on_change,
+        themes,
+        on_manage=None,
+    ):
         super().__init__()
         self.pool = pool
         self.plot_name = plot_name
         self.on_change = on_change
         self.themes = themes
         self._just_changed = False
+        self._on_manage_cb = on_manage
 
         t = themes.actual_theme
         acc = t.get("formula_accent", t["primary"])
@@ -256,21 +265,75 @@ class PlotColumn(ft.Container):
             padding=ft.Padding(8, 2, 8, 2),
         )
 
+        self.move_left_btn = ft.IconButton(
+            icon=ft.Icons.ARROW_BACK_IOS_NEW,
+            icon_size=16,
+            padding=ft.Padding.all(4),
+            tooltip=tm.translate("Mover a la izquierda"),
+            on_click=lambda e: asyncio.create_task(self._on_manage_click("move_left", e)),
+            icon_color=_c(t, "on_surface", 0.65),
+            visible=self._on_manage_cb is not None,
+        )
+        self.move_right_btn = ft.IconButton(
+            icon=ft.Icons.ARROW_FORWARD_IOS,
+            icon_size=16,
+            padding=ft.Padding.all(4),
+            tooltip=tm.translate("Mover a la derecha"),
+            on_click=lambda e: asyncio.create_task(self._on_manage_click("move_right", e)),
+            icon_color=_c(t, "on_surface", 0.65),
+            visible=self._on_manage_cb is not None,
+        )
+        self.remove_from_tab_btn = ft.IconButton(
+            icon=ft.Icons.REMOVE_CIRCLE_OUTLINE,
+            icon_size=16,
+            padding=ft.Padding.all(4),
+            tooltip=tm.translate("Eliminar de la pestaña"),
+            on_click=lambda e: asyncio.create_task(self._on_manage_click("remove_from_tab", e)),
+            icon_color=_c(t, "on_surface", 0.65),
+            visible=self._on_manage_cb is not None,
+        )
+        self.delete_variable_btn = ft.IconButton(
+            icon=ft.Icons.DELETE_OUTLINE_ROUNDED,
+            icon_size=16,
+            padding=ft.Padding.all(4),
+            tooltip=tm.translate("Eliminar variable"),
+            on_click=lambda e: asyncio.create_task(self._on_manage_click("delete_variable", e)),
+            icon_color=ft.Colors.RED_400,
+            visible=self._on_manage_cb is not None,
+        )
+        self.manage_btns = ft.Row(
+            [
+                self.move_left_btn,
+                self.move_right_btn,
+                self.remove_from_tab_btn,
+                self.delete_variable_btn,
+            ],
+            spacing=2,
+            visible=self._on_manage_cb is not None,
+        )
+
         header = ft.Container(
             content=ft.Row(
                 [
-                    ft.Icon(ft.Icons.SHOW_CHART_ROUNDED, size=18, color=acc),
-                    ft.Text(
-                        self.plot_name,
-                        size=14,
-                        weight=ft.FontWeight.W_600,
-                        color=_c(t, "on_surface"),
-                        overflow=ft.TextOverflow.ELLIPSIS,
-                        max_lines=1,
+                    ft.Row(
+                        [
+                            ft.Icon(ft.Icons.SHOW_CHART_OUTLINED, size=18, color=acc),
+                            ft.Text(
+                                self.plot_name,
+                                size=14,
+                                weight=ft.FontWeight.W_600,
+                                color=_c(t, "on_surface"),
+                                overflow=ft.TextOverflow.ELLIPSIS,
+                                max_lines=1,
+                                expand=True,
+                            ),
+                        ],
+                        spacing=6,
                         expand=True,
                     ),
+                    self.manage_btns,
                 ],
-                spacing=6,
+                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
             ),
             padding=ft.Padding(left=14, top=10, right=14, bottom=4),
         )
@@ -390,6 +453,14 @@ class PlotColumn(ft.Container):
             spacing=0,
             expand=True,
         )
+
+    async def _on_manage_click(self, action, e):
+        if not self._on_manage_cb:
+            return
+        if asyncio.iscoroutinefunction(self._on_manage_cb):
+            await self._on_manage_cb(self.plot_name, action)
+        else:
+            self._on_manage_cb(self.plot_name, action)
 
     def sync_with_pool(self):
         """Regenera la figura y reemplaza el control chart."""

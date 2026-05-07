@@ -76,6 +76,7 @@ async def open_create_plot_modal(
     refresh_all_dropdowns,
     update_shared_state,
     themes,
+    on_manage=None,
 ):
     t = themes.actual_theme
     acc = t.get("formula_accent", t["primary"])
@@ -281,7 +282,13 @@ async def open_create_plot_modal(
         }
 
         from screens.editor.components.plot_column import PlotColumn
-        new_col = PlotColumn(pool=pool, plot_name=plot_name, on_change=on_column_data_changed, themes=themes)
+        new_col = PlotColumn(
+            pool=pool,
+            plot_name=plot_name,
+            on_change=on_column_data_changed,
+            themes=themes,
+            on_manage=on_manage,
+        )
 
         controls = columns_row.controls
         if controls and getattr(controls[-1], "data", None) == "add_button":

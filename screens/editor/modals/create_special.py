@@ -35,6 +35,7 @@ async def open_create_special_modal(
     refresh_all_dropdowns,
     update_shared_state,
     themes,
+    on_manage=None,
 ):
     t = themes.actual_theme
     acc = t["primary"]
@@ -175,6 +176,7 @@ async def open_create_special_modal(
                 on_change=on_column_data_changed,
                 available_vars_getter=get_available_vars,
                 themes=themes,
+                on_manage=on_manage,
             )
         else:
             new_col = EditableColumn(
@@ -183,6 +185,7 @@ async def open_create_special_modal(
                 on_change=on_column_data_changed,
                 available_vars_getter=get_available_vars,
                 themes=themes,
+                on_manage=on_manage,
             )
 
         controls = columns_row.controls

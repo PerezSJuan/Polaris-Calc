@@ -294,7 +294,15 @@ class EditableColumn(ft.Container):
     • Stats strip (n / μ / σ) pinned at the bottom above the add-row button.
     """
 
-    def __init__(self, pool, current_name, on_change, available_vars_getter, themes):
+    def __init__(
+        self,
+        pool,
+        current_name,
+        on_change,
+        available_vars_getter,
+        themes,
+        on_manage=None,
+    ):
         super().__init__()
         self.pool = pool
         self.current_name = current_name
@@ -303,6 +311,7 @@ class EditableColumn(ft.Container):
         self.themes = themes
         self._just_changed = False
         self._focused_cell = None  # tracks which TextField is currently focused
+        self._on_manage_cb = on_manage
 
         t = themes.actual_theme
         self.width = _CARD_W
@@ -357,6 +366,54 @@ class EditableColumn(ft.Container):
         # ── header: icon + LaTeX + ⚙ ─────────────────────────────────────────
         self.header_display = txt.markdown(self._get_latex_header(), size=14)
 
+        self.move_left_btn = ft.IconButton(
+            icon=ft.Icons.ARROW_BACK_IOS_NEW,
+            icon_size=16,
+            padding=ft.Padding.all(4),
+            tooltip=tm.translate("Mover a la izquierda"),
+            on_click=lambda e: asyncio.create_task(self._on_manage_click("move_left", e)),
+            icon_color=_c(t, "on_surface", 0.65),
+            visible=self._on_manage_cb is not None,
+        )
+        self.move_right_btn = ft.IconButton(
+            icon=ft.Icons.ARROW_FORWARD_IOS,
+            icon_size=16,
+            padding=ft.Padding.all(4),
+            tooltip=tm.translate("Mover a la derecha"),
+            on_click=lambda e: asyncio.create_task(self._on_manage_click("move_right", e)),
+            icon_color=_c(t, "on_surface", 0.65),
+            visible=self._on_manage_cb is not None,
+        )
+        self.remove_from_tab_btn = ft.IconButton(
+            icon=ft.Icons.REMOVE_CIRCLE_OUTLINE,
+            icon_size=16,
+            padding=ft.Padding.all(4),
+            tooltip=tm.translate("Eliminar de la pestaña"),
+            on_click=lambda e: asyncio.create_task(self._on_manage_click("remove_from_tab", e)),
+            icon_color=_c(t, "on_surface", 0.65),
+            visible=self._on_manage_cb is not None,
+        )
+        self.delete_variable_btn = ft.IconButton(
+            icon=ft.Icons.DELETE_OUTLINE_ROUNDED,
+            icon_size=16,
+            padding=ft.Padding.all(4),
+            tooltip=tm.translate("Eliminar variable"),
+            on_click=lambda e: asyncio.create_task(self._on_manage_click("delete_variable", e)),
+            icon_color=ft.Colors.RED_400,
+            visible=self._on_manage_cb is not None,
+        )
+        self.manage_btns = ft.Row(
+            [
+                self.move_left_btn,
+                self.move_right_btn,
+                self.remove_from_tab_btn,
+                self.delete_variable_btn,
+            ],
+            spacing=2,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            visible=self._on_manage_cb is not None,
+        )
+
         self.settings_btn = ft.IconButton(
             icon=ft.Icons.SETTINGS_OUTLINED,
             on_click=self._open_settings_modal,
@@ -377,6 +434,7 @@ class EditableColumn(ft.Container):
                         spacing=5,
                         expand=True,
                     ),
+                    self.manage_btns,
                     self.settings_btn,
                 ],
                 alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
@@ -1025,6 +1083,14 @@ class EditableColumn(ft.Container):
     def _on_description_change(self, e=None):
         self.pool[self.current_name]["description"] = self.description_field.value
         self._notify_change()
+
+    async def _on_manage_click(self, action, e):
+        if not self._on_manage_cb:
+            return
+        if asyncio.iscoroutinefunction(self._on_manage_cb):
+            await self._on_manage_cb(self.current_name, action)
+        else:
+            self._on_manage_cb(self.current_name, action)
 
     def _open_settings_modal(self, e):
         page = self.page
