@@ -221,6 +221,7 @@ async def open_create_special_modal(
                         _card(type_dropdown),
                     ],
                     spacing=0,
+                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                 ),
             ],
             actions=[
