@@ -15,8 +15,12 @@ from screens.editor.components.latex_dropdown import get_latex_widget
 from utils.variable_types import (
     VARIABLE_TYPE_BOOLEAN,
     VARIABLE_TYPE_BOOLEAN_COLUMN,
+    VARIABLE_TYPE_COMPLEX,
+    VARIABLE_TYPE_VECTOR,
     VARIABLE_TYPE_LABELS,
     is_boolean_type,
+    is_complex_type,
+    is_vector_type,
 )
 from screens.editor.modals.utils import (
     _c,
@@ -53,6 +57,8 @@ async def open_create_special_modal(
     _SPECIAL_TYPES = [
         VARIABLE_TYPE_BOOLEAN,
         VARIABLE_TYPE_BOOLEAN_COLUMN,
+        VARIABLE_TYPE_COMPLEX,
+        VARIABLE_TYPE_VECTOR,
     ]
 
     type_dropdown = dropdown(
@@ -66,6 +72,60 @@ async def open_create_special_modal(
         ],
         value=VARIABLE_TYPE_BOOLEAN,
     )
+
+    # Campo para dimensiones del vector con spinner visual
+    dimensions_value = [2]  # mutable container for closure
+    
+    def _increment_dims():
+        dimensions_value[0] = min(dimensions_value[0] + 1, 10)
+        dims_display.value = str(dimensions_value[0])
+        dims_display.update()
+    
+    def _decrement_dims():
+        dimensions_value[0] = max(dimensions_value[0] - 1, 1)
+        dims_display.value = str(dimensions_value[0])
+        dims_display.update()
+    
+    dims_display = ft.Text(str(dimensions_value[0]), size=24, weight="bold")
+    
+    dimensions_field = ft.Container(
+        content=ft.Row(
+            [
+                ft.IconButton(
+                    icon=ft.Icons.REMOVE,
+                    on_click=lambda e: _decrement_dims(),
+                    tooltip=tm.translate("Disminuir dimensiones"),
+                ),
+                ft.Container(
+                    content=dims_display,
+                    alignment=ft.Alignment.CENTER,
+                    width=60,
+                ),
+                ft.IconButton(
+                    icon=ft.Icons.ADD,
+                    on_click=lambda e: _increment_dims(),
+                    tooltip=tm.translate("Aumentar dimensiones"),
+                ),
+            ],
+            spacing=10,
+            alignment=ft.MainAxisAlignment.CENTER,
+        ),
+        visible=False,
+    )
+
+    def _on_type_change(e):
+        var_type = type_dropdown.value
+        dimensions_field.visible = is_vector_type(var_type)
+        try:
+            dimensions_field.update()
+        except:
+            pass
+        try:
+            dimensions_field.update()
+        except:
+            pass
+
+    type_dropdown.on_change = _on_type_change
 
     # ── Preview LaTeX ─────────────────────────────────────────────────────────
     preview_latex_widget = [get_latex_widget("", size=16)]
@@ -156,21 +216,71 @@ async def open_create_special_modal(
             _show_error(tm.translate("Ya existe una variable con ese nombre."))
             return
 
-        pool[var_name] = {
-            "values": [False] if var_type == VARIABLE_TYPE_BOOLEAN else [],
-            "errors": [],
-            "type": var_type,
-            "magnitude": "none",
-            "unit": "none",
-            "description": desc_field.value.strip(),
-            "formula": "",
-        }
+        if is_vector_type(var_type):
+            try:
+                n = dimensions_value[0]
+                if n < 1:
+                    raise ValueError
+            except:
+                _show_error(tm.translate("La dimensión debe ser un número entero positivo."))
+                return
+            pool[var_name] = {
+                "values": [[] for _ in range(n)],  # n listas vacías
+                "errors": [],
+                "type": var_type,
+                "magnitude": "none",
+                "unit": "none",
+                "description": desc_field.value.strip(),
+                "formula": "",
+                "dimensions": n,
+            }
+        elif is_complex_type(var_type):
+            pool[var_name] = {
+                "values": ["0+0j"],
+                "errors": [],
+                "type": var_type,
+                "magnitude": "none",
+                "unit": "none",
+                "description": desc_field.value.strip(),
+                "formula": "",
+                "form": "rectangular",  # rectangular or polar
+            }
+        else:
+            pool[var_name] = {
+                "values": [False] if var_type == VARIABLE_TYPE_BOOLEAN else [],
+                "errors": [],
+                "type": var_type,
+                "magnitude": "none",
+                "unit": "none",
+                "description": desc_field.value.strip(),
+                "formula": "",
+            }
 
         from screens.editor.components.column import EditableColumn
         from screens.editor.components.boolean_column import BooleanColumn
+        from screens.editor.components.complex_column import ComplexColumn
+        from screens.editor.components.vector_column import VectorColumn
 
         if is_boolean_type(var_type):
             new_col = BooleanColumn(
+                pool=pool,
+                current_name=var_name,
+                on_change=on_column_data_changed,
+                available_vars_getter=get_available_vars,
+                themes=themes,
+                on_manage=on_manage,
+            )
+        elif is_complex_type(var_type):
+            new_col = ComplexColumn(
+                pool=pool,
+                current_name=var_name,
+                on_change=on_column_data_changed,
+                available_vars_getter=get_available_vars,
+                themes=themes,
+                on_manage=on_manage,
+            )
+        elif is_vector_type(var_type):
+            new_col = VectorColumn(
                 pool=pool,
                 current_name=var_name,
                 on_change=on_column_data_changed,
@@ -222,6 +332,7 @@ async def open_create_special_modal(
                         _card(desc_field),
                         _section_header(tm.translate("Tipo")),
                         _card(type_dropdown),
+                        _card(dimensions_field),
                     ],
                     spacing=0,
                     horizontal_alignment=ft.CrossAxisAlignment.CENTER,

@@ -9,6 +9,8 @@ VARIABLE_TYPE_PLOT = "plot"
 VARIABLE_TYPE_BOOLEAN = "boolean"
 VARIABLE_TYPE_BOOLEAN_COLUMN = "boolean_column"
 VARIABLE_TYPE_BOOLEAN_FORMULA = "boolean_formula"
+VARIABLE_TYPE_COMPLEX = "complex"
+VARIABLE_TYPE_VECTOR = "vector"
 
 ALL_VARIABLE_TYPES = [
     VARIABLE_TYPE_CONSTANT_NO_ERROR,
@@ -22,6 +24,8 @@ ALL_VARIABLE_TYPES = [
     VARIABLE_TYPE_BOOLEAN,
     VARIABLE_TYPE_BOOLEAN_COLUMN,
     VARIABLE_TYPE_BOOLEAN_FORMULA,
+    VARIABLE_TYPE_COMPLEX,
+    VARIABLE_TYPE_VECTOR,
 ]
 
 VARIABLE_TYPE_LABELS = {
@@ -36,6 +40,8 @@ VARIABLE_TYPE_LABELS = {
     VARIABLE_TYPE_BOOLEAN: "Booleano",
     VARIABLE_TYPE_BOOLEAN_COLUMN: "Columna de booleanos",
     VARIABLE_TYPE_BOOLEAN_FORMULA: "Función booleana",
+    VARIABLE_TYPE_COMPLEX: "Complejo",
+    VARIABLE_TYPE_VECTOR: "Vector n-dimensional",
 }
 
 FORMULA_VARIABLE_TYPES = {
@@ -52,12 +58,21 @@ CONSTANT_VARIABLE_TYPES = {
     VARIABLE_TYPE_CONSTANT_NO_ERROR,
     VARIABLE_TYPE_CONSTANT_WITH_ERROR,
     VARIABLE_TYPE_BOOLEAN,
+    VARIABLE_TYPE_COMPLEX,
 }
 
 BOOLEAN_VARIABLE_TYPES = {
     VARIABLE_TYPE_BOOLEAN,
     VARIABLE_TYPE_BOOLEAN_COLUMN,
     VARIABLE_TYPE_BOOLEAN_FORMULA,
+}
+
+COMPLEX_VARIABLE_TYPES = {
+    VARIABLE_TYPE_COMPLEX,
+}
+
+VECTOR_VARIABLE_TYPES = {
+    VARIABLE_TYPE_VECTOR,
 }
 
 VARIABLE_TYPES_WITH_SINGLE_ERROR = {
@@ -88,6 +103,14 @@ def is_constant_type(var_type: str) -> bool:
 
 def is_boolean_type(var_type: str) -> bool:
     return var_type in BOOLEAN_VARIABLE_TYPES
+
+
+def is_complex_type(var_type: str) -> bool:
+    return var_type in COMPLEX_VARIABLE_TYPES
+
+
+def is_vector_type(var_type: str) -> bool:
+    return var_type in VECTOR_VARIABLE_TYPES
 
 
 def has_single_error(var_type: str) -> bool:
