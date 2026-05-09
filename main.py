@@ -12,6 +12,7 @@ import flet_base.components.texts as txt
 # -----------INPUTS----------------
 from components.topbar import create_topbar
 from screens.editor.editor import EditorScreen
+from screens.home import HomeScreen
 
 
 def get_assets_dir() -> Path:
@@ -179,20 +180,7 @@ async def TopBar(data: fr.DataSystem, view: ft.View) -> ft.View:
 # _____________ROUTES________________
 @app.page("/home")
 async def Home(data: fr.DataSystem):
-    async def go_to_editor(e):
-        await data.page.push_route("/editor")
-
-    return ft.View(
-        route="/home",
-        controls=[
-            txt.body(tm.translate("Acerca de")),
-            # Agrega aquí todos los controles de la página
-            ft.Text("Contenido de la página principal"),
-            ft.Button("Ir al Editor", on_click=go_to_editor),
-        ],
-        vertical_alignment=ft.MainAxisAlignment.START,
-        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-    )
+    return await HomeScreen(data)
 
 
 @app.page("/settings")
