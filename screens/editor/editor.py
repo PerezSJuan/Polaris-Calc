@@ -413,6 +413,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
                 on_change=on_column_data_changed,
                 themes=themes,
                 on_manage=_handle_column_manage,
+                shared=data.shared,
             )
         if is_boolean_type(vt):
             return BooleanColumn(
@@ -498,6 +499,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
                         data.page, name, pool, on_column_data_changed, themes
                     ),
                     on_delete=_confirm_delete_variable,
+                    shared=data.shared,
                 )
             ]
             content_container.content = summary_col
@@ -646,6 +648,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
             update_shared_state=update_shared_state,
             themes=themes,
             on_manage=_handle_column_manage,
+            shared=data.shared,
         )
 
     data.shared["open_create_plot_modal"] = trigger_create_plot_modal

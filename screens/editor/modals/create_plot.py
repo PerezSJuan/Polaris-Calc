@@ -77,6 +77,7 @@ async def open_create_plot_modal(
     update_shared_state,
     themes,
     on_manage=None,
+    shared=None,
 ):
     t = themes.actual_theme
     acc = t.get("formula_accent", t["primary"])
@@ -288,6 +289,7 @@ async def open_create_plot_modal(
             on_change=on_column_data_changed,
             themes=themes,
             on_manage=on_manage,
+            shared=shared,
         )
 
         controls = columns_row.controls

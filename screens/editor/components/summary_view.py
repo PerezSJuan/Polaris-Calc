@@ -4,7 +4,7 @@ from flet_base.translations import instance_translation_manager as tm
 from flet_base.components.texts import body, subtitle
 
 
-from screens.editor.components.latex_dropdown import get_latex_widget
+from screens.editor.components.plot_column import _build_figure
 from utils.variable_types import (
     VARIABLE_TYPE_LABELS,
     infer_variable_type,
@@ -278,6 +278,7 @@ def _make_plot_card(
     themes,
     on_open_settings,
     on_delete=None,
+    on_export=None,
 ) -> ft.Container:
     t = getattr(themes, "actual_theme", themes if isinstance(themes, dict) else {})
     acc = t.get("formula_accent", t.get("primary", ft.Colors.BLUE))
@@ -328,6 +329,15 @@ def _make_plot_card(
             ),
             ft.Row(
                 [
+                    ft.IconButton(
+                        icon=ft.Icons.DOWNLOAD_OUTLINED,
+                        icon_size=16,
+                        icon_color=_c(t, "on_surface", 0.35),
+                        style=ft.ButtonStyle(padding=ft.Padding.all(2)),
+                        on_click=lambda e: asyncio.create_task(on_export(name, entry)),
+                        tooltip=tm.translate("Exportar como PNG"),
+                        visible=on_export is not None,
+                    ),
                     ft.IconButton(
                         icon=ft.Icons.SETTINGS_OUTLINED,
                         icon_size=16,
@@ -465,8 +475,24 @@ def _make_plot_card(
     )
 
 
-def SummaryView(pool, themes, on_open_settings=None, on_delete=None):
+def SummaryView(pool, themes, on_open_settings=None, on_delete=None, shared=None):
     t = getattr(themes, "actual_theme", themes if isinstance(themes, dict) else {})
+
+    async def _export_plot(name, entry):
+        if not shared or "file_picker_save" not in shared:
+            return
+        fig = _build_figure(pool, name)
+        if not fig:
+            return
+        saved_file = await shared["file_picker_save"].save_file(
+            allowed_extensions=["png"],
+            dialog_title=tm.translate("Guardar gráfico como PNG"),
+            file_name=f"{name}.png",
+        )
+        if saved_file:
+            fig.savefig(saved_file, format="png", bbox_inches="tight")
+        import matplotlib.pyplot as plt
+        plt.close(fig)
 
     def _handle_open_settings(var_name):
         if on_open_settings:
@@ -490,6 +516,7 @@ def SummaryView(pool, themes, on_open_settings=None, on_delete=None):
                             themes,
                             _handle_open_settings,
                             _handle_delete,
+                            _export_plot,
                         )
                     )
                 else:

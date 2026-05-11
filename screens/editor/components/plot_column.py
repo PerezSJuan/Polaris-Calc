@@ -190,6 +190,7 @@ class PlotColumn(ft.Container):
         on_change,
         themes,
         on_manage=None,
+        shared=None,
     ):
         super().__init__()
         self.pool = pool
@@ -198,6 +199,7 @@ class PlotColumn(ft.Container):
         self.themes = themes
         self._just_changed = False
         self._on_manage_cb = on_manage
+        self.shared = shared
 
         t = themes.actual_theme
         acc = t.get("formula_accent", t["primary"])
@@ -301,6 +303,15 @@ class PlotColumn(ft.Container):
             icon_color=ft.Colors.RED_400,
             visible=self._on_manage_cb is not None,
         )
+        self.export_btn = ft.IconButton(
+            icon=ft.Icons.DOWNLOAD_OUTLINED,
+            icon_size=16,
+            padding=ft.Padding.all(4),
+            tooltip=tm.translate("Exportar como PNG"),
+            on_click=lambda e: asyncio.create_task(self._export_plot(e)),
+            icon_color=_c(t, "on_surface", 0.65),
+            visible=self.shared is not None,
+        )
         self.manage_btns = ft.Row(
             [
                 self.move_left_btn,
@@ -331,7 +342,7 @@ class PlotColumn(ft.Container):
                         spacing=6,
                         expand=True,
                     ),
-                    self.manage_btns,
+                    ft.Row([self.export_btn, self.manage_btns], spacing=4),
                 ],
                 alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
             ),
@@ -461,6 +472,21 @@ class PlotColumn(ft.Container):
             await self._on_manage_cb(self.plot_name, action)
         else:
             self._on_manage_cb(self.plot_name, action)
+
+    async def _export_plot(self, e):
+        if not self.shared or "file_picker_save" not in self.shared:
+            return
+        fig = _build_figure(self.pool, self.plot_name)
+        if not fig:
+            return
+        saved_file = await self.shared["file_picker_save"].save_file(
+            allowed_extensions=["png"],
+            dialog_title=tm.translate("Guardar gráfico como PNG"),
+            file_name=f"{self.plot_name}.png",
+        )
+        if saved_file:
+            fig.savefig(saved_file, format="png", bbox_inches="tight")
+        plt.close(fig)
 
     def sync_with_pool(self):
         """Regenera la figura y reemplaza el control chart."""
