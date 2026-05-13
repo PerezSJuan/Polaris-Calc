@@ -23,6 +23,7 @@ from screens.editor.utils.utils import normalize_editor_data
 from screens.editor.components.column import EditableColumn
 from screens.editor.components.plot_column import PlotColumn
 from screens.editor.components.boolean_column import BooleanColumn
+from screens.editor.components.matrix_column import MatrixColumn
 from utils.variable_types import (
     VARIABLE_TYPE_COLUMN_NO_ERROR,
     VARIABLE_TYPE_FORMULA_WITH_ERROR,
@@ -31,6 +32,7 @@ from utils.variable_types import (
     is_formula_type,
     is_plot_type,
     is_boolean_type,
+    is_matrix_type,
 )
 from screens.editor.modals import (
     open_create_variable_modal,
@@ -39,6 +41,7 @@ from screens.editor.modals import (
     open_create_bool_modal,
     open_create_complex_modal,
     open_create_vector_modal,
+    open_create_matrix_modal,
     open_rename_tab_modal,
     open_variable_settings_modal,
 )
@@ -426,6 +429,15 @@ async def EditorScreen(data: fr.DataSystem, themes):
                 themes=themes,
                 on_manage=_handle_column_manage,
             )
+        if is_matrix_type(vt):
+            return MatrixColumn(
+                pool=pool,
+                current_name=name,
+                on_change=on_column_data_changed,
+                available_vars_getter=get_available_vars,
+                themes=themes,
+                on_manage=_handle_column_manage,
+            )
         return EditableColumn(
             pool=pool,
             current_name=name,
@@ -463,7 +475,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
         recalculate_derived_variables(show_errors=True)
         update_shared_state()
         for c in columns_row.controls:
-            if isinstance(c, (EditableColumn, PlotColumn, BooleanColumn)):
+            if isinstance(c, (EditableColumn, PlotColumn, BooleanColumn, MatrixColumn)):
                 c.sync_with_pool()
                 c._just_changed = False
         _update_add_column_menu_items()
@@ -698,9 +710,23 @@ async def EditorScreen(data: fr.DataSystem, themes):
             on_manage=_handle_column_manage,
         )
 
+    async def trigger_create_matrix_modal(e=None):
+        await open_create_matrix_modal(
+            page=data.page,
+            pool=pool,
+            columns_row=columns_row,
+            on_column_data_changed=on_column_data_changed,
+            get_available_vars=get_available_vars,
+            refresh_all_dropdowns=refresh_all_dropdowns,
+            update_shared_state=update_shared_state,
+            themes=themes,
+            on_manage=_handle_column_manage,
+        )
+
     data.shared["open_create_bool_modal"] = trigger_create_bool_modal
     data.shared["open_create_complex_modal"] = trigger_create_complex_modal
     data.shared["open_create_vector_modal"] = trigger_create_vector_modal
+    data.shared["open_create_matrix_modal"] = trigger_create_matrix_modal
 
     # ------------------------------------------------------------------
     # Static Elements

@@ -11,6 +11,7 @@ VARIABLE_TYPE_BOOLEAN_COLUMN = "boolean_column"
 VARIABLE_TYPE_BOOLEAN_FORMULA = "boolean_formula"
 VARIABLE_TYPE_COMPLEX = "complex"
 VARIABLE_TYPE_VECTOR = "vector"
+VARIABLE_TYPE_MATRIX = "matrix"
 
 ALL_VARIABLE_TYPES = [
     VARIABLE_TYPE_CONSTANT_NO_ERROR,
@@ -26,6 +27,7 @@ ALL_VARIABLE_TYPES = [
     VARIABLE_TYPE_BOOLEAN_FORMULA,
     VARIABLE_TYPE_COMPLEX,
     VARIABLE_TYPE_VECTOR,
+    VARIABLE_TYPE_MATRIX,
 ]
 
 VARIABLE_TYPE_LABELS = {
@@ -42,6 +44,7 @@ VARIABLE_TYPE_LABELS = {
     VARIABLE_TYPE_BOOLEAN_FORMULA: "Función booleana",
     VARIABLE_TYPE_COMPLEX: "Complejo",
     VARIABLE_TYPE_VECTOR: "Vector n-dimensional",
+    VARIABLE_TYPE_MATRIX: "Matriz",
 }
 
 FORMULA_VARIABLE_TYPES = {
@@ -59,6 +62,7 @@ CONSTANT_VARIABLE_TYPES = {
     VARIABLE_TYPE_CONSTANT_WITH_ERROR,
     VARIABLE_TYPE_BOOLEAN,
     VARIABLE_TYPE_COMPLEX,
+    VARIABLE_TYPE_MATRIX,
 }
 
 BOOLEAN_VARIABLE_TYPES = {
@@ -73,6 +77,10 @@ COMPLEX_VARIABLE_TYPES = {
 
 VECTOR_VARIABLE_TYPES = {
     VARIABLE_TYPE_VECTOR,
+}
+
+MATRIX_VARIABLE_TYPES = {
+    VARIABLE_TYPE_MATRIX,
 }
 
 VARIABLE_TYPES_WITH_SINGLE_ERROR = {
@@ -111,6 +119,10 @@ def is_complex_type(var_type: str) -> bool:
 
 def is_vector_type(var_type: str) -> bool:
     return var_type in VECTOR_VARIABLE_TYPES
+
+
+def is_matrix_type(var_type: str) -> bool:
+    return var_type in MATRIX_VARIABLE_TYPES
 
 
 def has_single_error(var_type: str) -> bool:

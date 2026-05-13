@@ -32,6 +32,8 @@ def _type_accent(var_type: str, themes) -> str:
         return t.get("constant_accent", t.get("secondary", ft.Colors.BLUE))
     if "error" in vt:
         return t.get("error_accent", t.get("error", ft.Colors.BLUE))
+    if "matrix" in vt:
+        return t.get("matrix_accent", ft.Colors.AMBER_400)
     return t.get("primary", ft.Colors.BLUE)
 
 
@@ -206,7 +208,10 @@ def _make_card(
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
         )
 
-    n_label = "ƒ" if derived else str(count)
+    if "matrix" in var_type_key:
+        n_label = f"{entry.get('rows', '?')} × {entry.get('cols', '?')}"
+    else:
+        n_label = "ƒ" if derived else str(count)
     mag_label = magnitude if magnitude != "none" else "—"
     unit_label = unit if unit != "none" else "—"
 

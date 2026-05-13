@@ -7,6 +7,7 @@ from screens.editor.modals.create_plot import open_create_plot_modal
 from screens.editor.modals.create_bool import open_create_bool_modal
 from screens.editor.modals.create_complex import open_create_complex_modal
 from screens.editor.modals.create_vector import open_create_vector_modal
+from screens.editor.modals.create_matrix import open_create_matrix_modal
 from screens.editor.modals.rename_tab import open_rename_tab_modal
 from screens.editor.modals.variable_settings import open_variable_settings_modal
 
@@ -35,6 +36,7 @@ __all__ = [
     "open_create_bool_modal",
     "open_create_complex_modal",
     "open_create_vector_modal",
+    "open_create_matrix_modal",
     "open_rename_tab_modal",
     "open_variable_settings_modal",
     "SI_PREFIXES",
