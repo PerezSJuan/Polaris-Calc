@@ -162,7 +162,7 @@ def _make_card(
     )
 
     # ── single value (only if exactly 1 numeric value) ────────────────────────
-    single_nums = [v for v in values if isinstance(v, (int, float))]
+    single_nums = [v for v in values if isinstance(v, (int, float)) and not isinstance(v, bool)]
     single_val_widget = ft.Container(
         visible=len(single_nums) == 1,
         content=ft.Row(
@@ -253,7 +253,7 @@ def _make_card(
         ),
         width=230,
         border_radius=15,
-        bgcolor=t["surface"],
+        bgcolor=t.get("surface", ft.Colors.WHITE if isinstance(t, dict) else ft.Colors.WHITE),
         border=ft.Border(
             left=ft.BorderSide(3, ft.Colors.with_opacity(0.22, acc)),
             right=ft.BorderSide(1, _c(t, "on_surface", 0.05)),

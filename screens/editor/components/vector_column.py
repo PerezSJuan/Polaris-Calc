@@ -347,17 +347,18 @@ class VectorColumn(ft.Container):
                 ft.Container(
                     content=self.rows_col,
                     padding=ft.Padding(left=_PADDING, right=_PADDING, top=0, bottom=0),
+                    expand=True,
                 ),
                 # fixed bottom section
                 self.global_error_container,
                 self._stats_container,
                 ft.Container(
-                    content=self.add_row_btn,
-                    alignment=ft.Alignment.CENTER,
-                    padding=ft.Padding(0, 10, 0, 10),
+                    content=ft.Row([self.add_row_btn], alignment=ft.MainAxisAlignment.CENTER),
+                    padding=ft.Padding(0, 4, 0, 8),
                 ),
             ],
             spacing=0,
+            expand=True,
         )
 
     # ──────────────────────────────────────────────────────────────────────────

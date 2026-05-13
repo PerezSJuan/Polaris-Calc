@@ -440,13 +440,16 @@ async def EditorScreen(data: fr.DataSystem, themes):
     # ------------------------------------------------------------------
 
     def update_shared_state():
+        saved_active = active_index[0] - 1 if active_index[0] > 0 else -1
         data.shared["editor_data"] = {
             "columns": [{"name": name, **entry} for name, entry in pool.items()],
             "layout": {
                 "tabs": [
-                    {"name": t["name"], "columns": list(t["columns"])} for t in tabs
+                    {"name": t["name"], "columns": list(t["columns"])}
+                    for t in tabs
+                    if not t.get("fixed")
                 ],
-                "active_tab_index": active_index[0],
+                "active_tab_index": saved_active,
             },
         }
 
@@ -456,6 +459,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
 
     def on_column_data_changed():
         _current_tab()["columns"] = _all_named_columns()
+        _rebuild_columns_row()
         recalculate_derived_variables(show_errors=True)
         update_shared_state()
         for c in columns_row.controls:

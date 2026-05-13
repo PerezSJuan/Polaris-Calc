@@ -53,28 +53,39 @@ def _type_accent(var_type: str, themes) -> str:
     return t["primary"]
 
 
-def _fmt(v: float) -> str:
+def _fmt(v) -> str:
     import math
 
-    if not math.isfinite(v):
-        return str(v)  # "inf", "-inf", "nan"
-    # Use a larger budget (12) for the UI to avoid premature rounding/scientific notation
-    if v == int(v) and abs(v) < 1e15:
-        return _smart_format(int(v), max_chars=12)
-    return _smart_format(v, max_chars=12)
+    if isinstance(v, complex):
+        real_part = _fmt(v.real)
+        imag_part = _fmt(v.imag)
+        sign = "+" if v.imag >= 0 else ""
+        return f"{real_part}{sign}{imag_part}j"
+    if isinstance(v, (int, float)):
+        if not math.isfinite(v):
+            return str(v)  # "inf", "-inf", "nan"
+        # Use a larger budget (12) for the UI to avoid premature rounding/scientific notation
+        if v == int(v) and abs(v) < 1e15:
+            return _smart_format(int(v), max_chars=12)
+        return _smart_format(v, max_chars=12)
+    return str(v)
 
 
-def _fmt_edit(v: float) -> str:
+def _fmt_edit(v) -> str:
     """Format for editing: show full number unless it is extremely large."""
     import math
 
-    if not math.isfinite(v):
+    if isinstance(v, complex):
         return str(v)
-    if abs(v) >= 1e20:
-        return f"{v:e}"
-    # Use enough precision to avoid scientific notation, then strip
-    res = f"{v:.15f}".rstrip("0").rstrip(".")
-    return res if res != "-0" else "0"
+    if isinstance(v, (int, float)):
+        if not math.isfinite(v):
+            return str(v)
+        if abs(v) >= 1e20:
+            return f"{v:e}"
+        # Use enough precision to avoid scientific notation, then strip
+        res = f"{v:.15f}".rstrip("0").rstrip(".")
+        return res if res != "-0" else "0"
+    return str(v)
 
 
 class LatexCell(ft.Stack):
