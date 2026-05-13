@@ -5,6 +5,7 @@ from flet_base.components.texts import body, subtitle
 
 
 from screens.editor.components.plot_column import _build_figure
+from screens.editor.components.latex_dropdown import get_latex_widget
 from utils.variable_types import (
     VARIABLE_TYPE_LABELS,
     infer_variable_type,

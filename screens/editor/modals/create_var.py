@@ -16,10 +16,11 @@ from flet_base.components.buttons import text_btn, filled_btn
 from screens.editor.components.latex_dropdown import get_latex_widget
 from utils.variable_types import (
     VARIABLE_TYPE_LABELS,
-    FORMULA_VARIABLE_TYPES,
-    ALL_VARIABLE_TYPES,
+    VARIABLE_TYPE_CONSTANT_NO_ERROR,
+    VARIABLE_TYPE_CONSTANT_WITH_ERROR,
     VARIABLE_TYPE_COLUMN_NO_ERROR,
-    is_boolean_type,
+    VARIABLE_TYPE_COLUMN_WITH_SINGLE_ERROR,
+    VARIABLE_TYPE_COLUMN_WITH_ERROR_PER_VALUE,
 )
 from screens.editor.modals.utils import (
     default_units,
@@ -34,9 +35,13 @@ from screens.editor.modals.utils import (
     _full_unit,
 )
 
-# Solo los tipos que NO son fórmula
+# Solo los 5 tipos de variables normales permitidas
 _VARIABLE_ONLY_TYPES = [
-    vt for vt in ALL_VARIABLE_TYPES if vt not in FORMULA_VARIABLE_TYPES
+    VARIABLE_TYPE_CONSTANT_NO_ERROR,
+    VARIABLE_TYPE_CONSTANT_WITH_ERROR,
+    VARIABLE_TYPE_COLUMN_NO_ERROR,
+    VARIABLE_TYPE_COLUMN_WITH_SINGLE_ERROR,
+    VARIABLE_TYPE_COLUMN_WITH_ERROR_PER_VALUE,
 ]
 
 
@@ -383,26 +388,15 @@ async def open_create_variable_modal(
         }
 
         from screens.editor.components.column import EditableColumn
-        from screens.editor.components.boolean_column import BooleanColumn
 
-        if is_boolean_type(var_type):
-            new_col = BooleanColumn(
-                pool=pool,
-                current_name=var_name,
-                on_change=on_column_data_changed,
-                available_vars_getter=get_available_vars,
-                themes=themes,
-                on_manage=on_manage,
-            )
-        else:
-            new_col = EditableColumn(
-                pool=pool,
-                current_name=var_name,
-                on_change=on_column_data_changed,
-                available_vars_getter=get_available_vars,
-                themes=themes,
-                on_manage=on_manage,
-            )
+        new_col = EditableColumn(
+            pool=pool,
+            current_name=var_name,
+            on_change=on_column_data_changed,
+            available_vars_getter=get_available_vars,
+            themes=themes,
+            on_manage=on_manage,
+        )
 
         controls = columns_row.controls
         if controls and getattr(controls[-1], "data", None) == "add_button":
