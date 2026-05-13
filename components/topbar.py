@@ -131,8 +131,18 @@ def create_topbar(
         if trigger:
             await trigger(e)
 
-    async def handle_trigger_create_special(e):
-        trigger = shared.get("open_create_special_modal") if shared is not None else None
+    async def handle_trigger_create_bool(e):
+        trigger = shared.get("open_create_bool_modal") if shared is not None else None
+        if trigger:
+            await trigger(e)
+
+    async def handle_trigger_create_complex(e):
+        trigger = shared.get("open_create_complex_modal") if shared is not None else None
+        if trigger:
+            await trigger(e)
+
+    async def handle_trigger_create_vector(e):
+        trigger = shared.get("open_create_vector_modal") if shared is not None else None
         if trigger:
             await trigger(e)
 
@@ -241,10 +251,24 @@ def create_topbar(
                         ),
                         ft.MenuItemButton(
                             content=ft.Text(
-                                translation_manager.translate("Datos especiales")
+                                translation_manager.translate("Agregar booleano")
                             ),
                             disabled=page.route != "/editor",
-                            on_click=handle_trigger_create_special,
+                            on_click=handle_trigger_create_bool,
+                        ),
+                        ft.MenuItemButton(
+                            content=ft.Text(
+                                translation_manager.translate("Agregar complejo")
+                            ),
+                            disabled=page.route != "/editor",
+                            on_click=handle_trigger_create_complex,
+                        ),
+                        ft.MenuItemButton(
+                            content=ft.Text(
+                                translation_manager.translate("Agregar vector")
+                            ),
+                            disabled=page.route != "/editor",
+                            on_click=handle_trigger_create_vector,
                         ),
                     ],
                 ),

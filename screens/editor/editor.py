@@ -36,7 +36,9 @@ from screens.editor.modals import (
     open_create_variable_modal,
     open_create_formula_modal,
     open_create_plot_modal,
-    open_create_special_modal,
+    open_create_bool_modal,
+    open_create_complex_modal,
+    open_create_vector_modal,
     open_rename_tab_modal,
     open_variable_settings_modal,
 )
@@ -653,8 +655,8 @@ async def EditorScreen(data: fr.DataSystem, themes):
 
     data.shared["open_create_plot_modal"] = trigger_create_plot_modal
 
-    async def trigger_create_special_modal(e=None):
-        await open_create_special_modal(
+    async def trigger_create_bool_modal(e=None):
+        await open_create_bool_modal(
             page=data.page,
             pool=pool,
             columns_row=columns_row,
@@ -666,7 +668,35 @@ async def EditorScreen(data: fr.DataSystem, themes):
             on_manage=_handle_column_manage,
         )
 
-    data.shared["open_create_special_modal"] = trigger_create_special_modal
+    async def trigger_create_complex_modal(e=None):
+        await open_create_complex_modal(
+            page=data.page,
+            pool=pool,
+            columns_row=columns_row,
+            on_column_data_changed=on_column_data_changed,
+            get_available_vars=get_available_vars,
+            refresh_all_dropdowns=refresh_all_dropdowns,
+            update_shared_state=update_shared_state,
+            themes=themes,
+            on_manage=_handle_column_manage,
+        )
+
+    async def trigger_create_vector_modal(e=None):
+        await open_create_vector_modal(
+            page=data.page,
+            pool=pool,
+            columns_row=columns_row,
+            on_column_data_changed=on_column_data_changed,
+            get_available_vars=get_available_vars,
+            refresh_all_dropdowns=refresh_all_dropdowns,
+            update_shared_state=update_shared_state,
+            themes=themes,
+            on_manage=_handle_column_manage,
+        )
+
+    data.shared["open_create_bool_modal"] = trigger_create_bool_modal
+    data.shared["open_create_complex_modal"] = trigger_create_complex_modal
+    data.shared["open_create_vector_modal"] = trigger_create_vector_modal
 
     # ------------------------------------------------------------------
     # Static Elements

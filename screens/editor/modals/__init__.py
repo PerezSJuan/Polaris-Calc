@@ -4,7 +4,9 @@ from screens.editor.modals.create_column import open_create_column_modal  # lega
 from screens.editor.modals.create_var import open_create_variable_modal
 from screens.editor.modals.create_equation import open_create_formula_modal
 from screens.editor.modals.create_plot import open_create_plot_modal
-from screens.editor.modals.create_special import open_create_special_modal
+from screens.editor.modals.create_bool import open_create_bool_modal
+from screens.editor.modals.create_complex import open_create_complex_modal
+from screens.editor.modals.create_vector import open_create_vector_modal
 from screens.editor.modals.rename_tab import open_rename_tab_modal
 from screens.editor.modals.variable_settings import open_variable_settings_modal
 
@@ -30,7 +32,9 @@ __all__ = [
     "open_create_variable_modal",
     "open_create_formula_modal",
     "open_create_plot_modal",
-    "open_create_special_modal",
+    "open_create_bool_modal",
+    "open_create_complex_modal",
+    "open_create_vector_modal",
     "open_rename_tab_modal",
     "open_variable_settings_modal",
     "SI_PREFIXES",

@@ -1,11 +1,8 @@
 """
-Modal: Crear Variable
-Permite crear tipos de variables normales:
-  · Constante sin error
-  · Constante con error
-  · Columna sin error
-  · Columna con error único
-  · Columna con error por valor
+Modal: Crear Booleano
+Permite crear tipos booleanos:
+  · Booleano (Constante)
+  · Columna de booleanos
 """
 
 import flet as ft
@@ -15,11 +12,8 @@ from flet_base.components.modals import modal
 from flet_base.components.buttons import text_btn, filled_btn
 from screens.editor.components.latex_dropdown import get_latex_widget
 from utils.variable_types import (
-    VARIABLE_TYPE_CONSTANT_NO_ERROR,
-    VARIABLE_TYPE_CONSTANT_WITH_ERROR,
-    VARIABLE_TYPE_COLUMN_NO_ERROR,
-    VARIABLE_TYPE_COLUMN_WITH_SINGLE_ERROR,
-    VARIABLE_TYPE_COLUMN_WITH_ERROR_PER_VALUE,
+    VARIABLE_TYPE_BOOLEAN,
+    VARIABLE_TYPE_BOOLEAN_COLUMN,
     VARIABLE_TYPE_LABELS,
 )
 from screens.editor.modals.utils import (
@@ -30,7 +24,7 @@ from screens.editor.modals.utils import (
 )
 
 
-async def open_create_special_modal(
+async def open_create_bool_modal(
     page,
     pool,
     columns_row,
@@ -42,7 +36,6 @@ async def open_create_special_modal(
     on_manage=None,
 ):
     t = themes.actual_theme
-    acc = t["primary"]
 
     # ── Campos ────────────────────────────────────────────────────────────────
     name_field = text_input(
@@ -54,14 +47,6 @@ async def open_create_special_modal(
         max_lines=3,
     )
 
-    _VARIABLE_TYPES = [
-        VARIABLE_TYPE_CONSTANT_NO_ERROR,
-        VARIABLE_TYPE_CONSTANT_WITH_ERROR,
-        VARIABLE_TYPE_COLUMN_NO_ERROR,
-        VARIABLE_TYPE_COLUMN_WITH_SINGLE_ERROR,
-        VARIABLE_TYPE_COLUMN_WITH_ERROR_PER_VALUE,
-    ]
-
     type_dropdown = dropdown(
         label=tm.translate("Tipo"),
         options=[
@@ -69,10 +54,11 @@ async def open_create_special_modal(
                 key=vt,
                 text=tm.translate(VARIABLE_TYPE_LABELS.get(vt, vt)),
             )
-            for vt in _VARIABLE_TYPES
+            for vt in [VARIABLE_TYPE_BOOLEAN, VARIABLE_TYPE_BOOLEAN_COLUMN]
         ],
-        value=VARIABLE_TYPE_CONSTANT_NO_ERROR,
+        value=VARIABLE_TYPE_BOOLEAN,
     )
+
 
     # ── Preview LaTeX ─────────────────────────────────────────────────────────
     preview_latex_widget = [get_latex_widget("", size=16)]
@@ -102,7 +88,7 @@ async def open_create_special_modal(
             preview_container.visible = False
             try:
                 preview_container.update()
-            except:
+            except Exception:
                 pass
             return
         has_special = any(c in name for c in ("^", "_", "\\"))
@@ -112,7 +98,7 @@ async def open_create_special_modal(
         preview_container.visible = True
         try:
             preview_container.update()
-        except:
+        except Exception:
             pass
 
     name_field.on_change = lambda e: _refresh_preview()
@@ -139,14 +125,14 @@ async def open_create_special_modal(
         error_banner.visible = True
         try:
             error_banner.update()
-        except:
+        except Exception:
             pass
 
     def _hide_error():
         error_banner.visible = False
         try:
             error_banner.update()
-        except:
+        except Exception:
             pass
 
     # ── Guardar ───────────────────────────────────────────────────────────────
@@ -163,20 +149,19 @@ async def open_create_special_modal(
             _show_error(tm.translate("Ya existe una variable con ese nombre."))
             return
 
-        # Crear variable normal
         pool[var_name] = {
-            "values": [],
+            "values": [False] if var_type == VARIABLE_TYPE_BOOLEAN else [],
             "errors": [],
             "type": var_type,
             "magnitude": "none",
-            "unit": "none",
+            "unit": 0,
             "description": desc_field.value.strip(),
             "formula": "",
         }
 
-        from screens.editor.components.column import EditableColumn
+        from screens.editor.components.boolean_column import BooleanColumn
 
-        new_col = EditableColumn(
+        new_col = BooleanColumn(
             pool=pool,
             current_name=var_name,
             on_change=on_column_data_changed,
@@ -196,19 +181,19 @@ async def open_create_special_modal(
 
         try:
             columns_row.update()
-        except:
+        except Exception:
             pass
 
         page.pop_dialog()
         try:
             page.update()
-        except:
+        except Exception:
             pass
 
     # ── Mostrar modal ─────────────────────────────────────────────────────────
     page.show_dialog(
         modal(
-            title_str=tm.translate("Crear Variable"),
+            title_str=tm.translate("Crear Booleano"),
             content=[
                 error_banner,
                 ft.Column(
@@ -225,7 +210,9 @@ async def open_create_special_modal(
                 ),
             ],
             actions=[
-                text_btn(tm.translate("Cancelar"), on_click=lambda _: page.pop_dialog()),
+                text_btn(
+                    tm.translate("Cancelar"), on_click=lambda _: page.pop_dialog()
+                ),
                 filled_btn(tm.translate("Crear"), on_click=_save),
             ],
         )
