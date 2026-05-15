@@ -497,7 +497,12 @@ async def EditorScreen(data: fr.DataSystem, themes):
             _refresh_ui()
             return
 
-        # Determinamos si hace falta un rebuild completo (cambio de nombres o tipos)
+        # Sincronizamos el estado de la pestaña con lo que hay actualmente en la UI.
+        # Esto permite que si un modal añade un widget directamente a columns_row.controls,
+        # el cambio se persista inmediatamente en la pestaña actual (autoinstanciación).
+        _current_tab()["columns"] = _all_named_columns()
+
+        # Determinamos si hace falta un rebuild completo (cambio de tipos)
         tab_names = _current_tab().get("columns", [])
         visible_ctrls = [
             c for c in columns_row.controls 
@@ -509,6 +514,8 @@ async def EditorScreen(data: fr.DataSystem, themes):
             name = c.plot_name if isinstance(c, PlotColumn) else c.current_name
             visible_names.append(name)
 
+        # rebuild_needed será True si los nombres no coinciden (reordenamiento o eliminación)
+        # o si los tipos de las columnas han cambiado en el pool.
         rebuild_needed = (visible_names != tab_names)
         
         # Si los nombres coinciden, comprobamos que los tipos (clases) sigan siendo correctos
@@ -531,6 +538,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
 
         if rebuild_needed:
             _rebuild_columns_row()
+
         
         # Sincronizar datos y variables derivadas
         recalculate_derived_variables(show_errors=True)
