@@ -492,17 +492,58 @@ async def EditorScreen(data: fr.DataSystem, themes):
     # ------------------------------------------------------------------
 
     def on_column_data_changed():
-        _current_tab()["columns"] = _all_named_columns()
-        _rebuild_columns_row()
+        # Solo refrescar todo si estamos en la pestaña de Resumen
+        if active_index[0] == 0:
+            _refresh_ui()
+            return
+
+        # Determinamos si hace falta un rebuild completo (cambio de nombres o tipos)
+        tab_names = _current_tab().get("columns", [])
+        visible_ctrls = [
+            c for c in columns_row.controls 
+            if isinstance(c, (EditableColumn, BooleanColumn, ComplexColumn, VectorColumn, MatrixColumn, PlotColumn))
+        ]
+        
+        visible_names = []
+        for c in visible_ctrls:
+            name = c.plot_name if isinstance(c, PlotColumn) else c.current_name
+            visible_names.append(name)
+
+        rebuild_needed = (visible_names != tab_names)
+        
+        # Si los nombres coinciden, comprobamos que los tipos (clases) sigan siendo correctos
+        if not rebuild_needed:
+            for c in visible_ctrls:
+                name = c.plot_name if isinstance(c, PlotColumn) else c.current_name
+                vt = infer_variable_type(pool.get(name, {}))
+                
+                # Mapeo de tipos a clases
+                expected_class = EditableColumn
+                if is_plot_type(vt):    expected_class = PlotColumn
+                elif is_boolean_type(vt): expected_class = BooleanColumn
+                elif is_complex_type(vt): expected_class = ComplexColumn
+                elif is_vector_type(vt):  expected_class = VectorColumn
+                elif is_matrix_type(vt):  expected_class = MatrixColumn
+                
+                if not isinstance(c, expected_class):
+                    rebuild_needed = True
+                    break
+
+        if rebuild_needed:
+            _rebuild_columns_row()
+        
+        # Sincronizar datos y variables derivadas
         recalculate_derived_variables(show_errors=True)
         update_shared_state()
+        
+        # Sincronizar cada columna con el pool (esto actualiza valores sin recrear el widget)
         for c in columns_row.controls:
             if isinstance(c, (EditableColumn, PlotColumn, BooleanColumn, ComplexColumn, VectorColumn, MatrixColumn)):
                 c.sync_with_pool()
                 c._just_changed = False
+        
         _update_add_column_menu_items()
-        if active_index[0] == 0:  # If we are on Summary tab
-            _refresh_ui()
+
 
 
     def refresh_all_dropdowns():
