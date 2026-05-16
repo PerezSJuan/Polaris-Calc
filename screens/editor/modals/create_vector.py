@@ -396,7 +396,7 @@ async def open_create_vector_modal(
 
         n = dimensions_value[0]
         pool[var_name] = {
-            "values": [[] for _ in range(n)],
+            "values": [[]],
             "errors": [],
             "type": VARIABLE_TYPE_VECTOR,
             "magnitude": mag_dropdown.value,
