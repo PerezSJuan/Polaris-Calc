@@ -78,6 +78,9 @@ async def EditorScreen(data: fr.DataSystem, themes):
             "type": infer_variable_type(col),
             "errors": _normalize_errors(col.get("errors", [])),
             "plot_config": col.get("plot_config", {}),
+            "dimensions": col.get("dimensions"),
+            "rows": col.get("rows"),
+            "cols": col.get("cols"),
         }
         for col in normalized["columns"]
     }

@@ -85,6 +85,10 @@ def _normalize_columns(raw_data):
                 "unit": unit,
                 "description": description,
                 "formula": formula,
+                "plot_config": col.get("plot_config", {}),
+                "dimensions": col.get("dimensions"),
+                "rows": col.get("rows"),
+                "cols": col.get("cols"),
             }
         )
 
