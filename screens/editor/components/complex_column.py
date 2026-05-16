@@ -27,11 +27,11 @@ from utils.variable_types import (
 )
 
 # ── Design tokens ──────────────────────────────────────────────────────────────
-_CARD_W      = 310
-_PADDING     = 15
+_CARD_W = 310
+_PADDING = 15
 _CARD_RADIUS = 12
 
-MODE_BINOMIAL  = "binomial"
+MODE_BINOMIAL = "binomial"
 MODE_POLAR_DEG = "polar_deg"
 MODE_POLAR_RAD = "polar_rad"
 
@@ -49,13 +49,14 @@ _MODE_TO_ENTRY_FORM = {
 }
 
 _MODE_META = [
-    (MODE_BINOMIAL,  "a+bi",  "Forma binomial",  ft.Icons.FUNCTIONS),
-    (MODE_POLAR_DEG, "r∠θ°",  "Polar – grados",  ft.Icons.EXPLORE_OUTLINED),
+    (MODE_BINOMIAL, "a+bi", "Forma binomial", ft.Icons.FUNCTIONS),
+    (MODE_POLAR_DEG, "r∠θ°", "Polar – grados", ft.Icons.EXPLORE_OUTLINED),
     (MODE_POLAR_RAD, "re^iθ", "Polar – radianes", ft.Icons.ROTATE_RIGHT),
 ]
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
+
 
 def _c(t, key, opacity=1.0):
     col = t[key]
@@ -64,10 +65,13 @@ def _c(t, key, opacity=1.0):
 
 def _type_accent(var_type: str, themes) -> str:
     vt = var_type.lower()
-    t  = themes.actual_theme
-    if "formula"  in vt: return t.get("formula_accent",  t["primary"])
-    if "constant" in vt: return t.get("constant_accent", t["secondary"])
-    if "complex"  in vt: return t.get("complex_accent",  ft.Colors.PURPLE_300)
+    t = themes.actual_theme
+    if "formula" in vt:
+        return t.get("formula_accent", t["primary"])
+    if "constant" in vt:
+        return t.get("constant_accent", t["secondary"])
+    if "complex" in vt:
+        return t.get("complex_accent", ft.Colors.PURPLE_300)
     return t["primary"]
 
 
@@ -97,6 +101,7 @@ def _complex_to_str(real: float, imag: float) -> str:
 
 # ── ComplexRow ─────────────────────────────────────────────────────────────────
 
+
 class ComplexRow(ft.Container):
     """
     Fila con tres pares de LatexCell editables según el modo activo.
@@ -120,16 +125,16 @@ class ComplexRow(ft.Container):
         on_cell_blur=None,
     ):
         super().__init__()
-        self.themes      = themes
-        self._on_change  = on_change   # callback() sin args — se llama en on_blur
-        self._on_delete  = on_delete
+        self.themes = themes
+        self._on_change = on_change  # callback() sin args — se llama en on_blur
+        self._on_delete = on_delete
         self._on_cell_focus_cb = on_cell_focus
         self._on_cell_blur_cb = on_cell_blur
-        self.read_only   = read_only
-        self._mode       = display_mode
+        self.read_only = read_only
+        self._mode = display_mode
 
         # Dos floats en lugar de complex nativo (msgpack no serializa complex)
-        _parsed       = _parse_complex(value)
+        _parsed = _parse_complex(value)
         self._real: float = _parsed.real
         self._imag: float = _parsed.imag
 
@@ -143,7 +148,9 @@ class ComplexRow(ft.Container):
 
         self._del_btn = ft.IconButton(
             icon=ft.Icons.REMOVE_CIRCLE_OUTLINE,
-            icon_size=14, width=24, height=24,
+            icon_size=14,
+            width=24,
+            height=24,
             padding=0,
             tooltip=tm.translate("Eliminar fila"),
             on_click=self._handle_delete,
@@ -154,75 +161,90 @@ class ComplexRow(ft.Container):
 
         # ── Binomial ───────────────────────────────────────────────────────────
         self._cell_real = LatexCell(
-            value=_fmt(self._real), themes=self.themes,
+            value=_fmt(self._real),
+            themes=self.themes,
             on_change=None,
             on_focus=self._on_cell_focus,
             on_blur=self._on_blur_binomial,
-            read_only=self.read_only, compact=True,
+            read_only=self.read_only,
+            compact=True,
         )
         self._cell_imag = LatexCell(
-            value=_fmt(self._imag), themes=self.themes,
+            value=_fmt(self._imag),
+            themes=self.themes,
             on_change=None,
             on_focus=self._on_cell_focus,
             on_blur=self._on_blur_binomial,
-            read_only=self.read_only, compact=True,
+            read_only=self.read_only,
+            compact=True,
         )
         self._lbl_plus = ft.Text("+", size=12, color=_c(t, "on_surface", 0.45))
-        self._lbl_i    = ft.Text("i",  size=12, weight=ft.FontWeight.BOLD,
-                                 color=_c(t, "on_surface", 0.65))
+        self._lbl_i = ft.Text(
+            "i", size=12, weight=ft.FontWeight.BOLD, color=_c(t, "on_surface", 0.65)
+        )
 
         # ── Polar ──────────────────────────────────────────────────────────────
-        mod = math.sqrt(self._real ** 2 + self._imag ** 2)
+        mod = math.sqrt(self._real**2 + self._imag**2)
         arg = math.atan2(self._imag, self._real)
 
         self._cell_r = LatexCell(
-            value=_fmt(mod), themes=self.themes,
+            value=_fmt(mod),
+            themes=self.themes,
             on_change=None,
             on_focus=self._on_cell_focus,
             on_blur=self._on_blur_polar,
-            read_only=self.read_only, compact=True,
+            read_only=self.read_only,
+            compact=True,
         )
         self._cell_deg = LatexCell(
-            value=_fmt(math.degrees(arg)), themes=self.themes,
+            value=_fmt(math.degrees(arg)),
+            themes=self.themes,
             on_change=None,
             on_focus=self._on_cell_focus,
             on_blur=self._on_blur_polar,
-            read_only=self.read_only, compact=True,
+            read_only=self.read_only,
+            compact=True,
         )
         self._cell_rad = LatexCell(
-            value=_fmt(arg), themes=self.themes,
+            value=_fmt(arg),
+            themes=self.themes,
             on_change=None,
             on_focus=self._on_cell_focus,
             on_blur=self._on_blur_polar,
-            read_only=self.read_only, compact=True,
+            read_only=self.read_only,
+            compact=True,
         )
-        self._lbl_angle    = ft.Text("∠",   size=13, color=_c(t, "on_surface", 0.45))
-        self._lbl_deg_unit = ft.Text("°",   size=11, color=_c(t, "on_surface", 0.50))
+        self._lbl_angle = ft.Text("∠", size=13, color=_c(t, "on_surface", 0.45))
+        self._lbl_deg_unit = ft.Text("°", size=11, color=_c(t, "on_surface", 0.50))
         self._lbl_rad_unit = ft.Text("rad", size=10, color=_c(t, "on_surface", 0.50))
 
         self._row_binomial = ft.Row(
             [self._cell_real, self._lbl_plus, self._cell_imag, self._lbl_i],
-            spacing=3, vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            spacing=3,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
         )
         self._row_polar_deg = ft.Row(
             [self._cell_r, self._lbl_angle, self._cell_deg, self._lbl_deg_unit],
-            spacing=3, vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            spacing=3,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
         )
         self._row_polar_rad = ft.Row(
             [self._cell_r, self._lbl_angle, self._cell_rad, self._lbl_rad_unit],
-            spacing=3, vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            spacing=3,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
         )
 
         self.content = ft.Row(
             [self._row_for(self._mode), self._del_btn],
             alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
-            spacing=2, expand=True,
+            spacing=2,
+            expand=True,
         )
 
     def _row_for(self, mode: str) -> ft.Row:
         return {
-            MODE_BINOMIAL:  self._row_binomial,
+            MODE_BINOMIAL: self._row_binomial,
             MODE_POLAR_DEG: self._row_polar_deg,
             MODE_POLAR_RAD: self._row_polar_rad,
         }[mode]
@@ -242,8 +264,8 @@ class ComplexRow(ft.Container):
     async def _on_blur_polar(self, e=None):
         if self._mode == MODE_POLAR_DEG:
             try:
-                r   = float(self._cell_r.value   or 0)
-                deg = float(self._cell_deg.value  or 0)
+                r = float(self._cell_r.value or 0)
+                deg = float(self._cell_deg.value or 0)
                 rad = math.radians(deg)
                 self._real = r * math.cos(rad)
                 self._imag = r * math.sin(rad)
@@ -251,8 +273,8 @@ class ComplexRow(ft.Container):
                 pass
         else:
             try:
-                r   = float(self._cell_r.value   or 0)
-                rad = float(self._cell_rad.value  or 0)
+                r = float(self._cell_r.value or 0)
+                rad = float(self._cell_rad.value or 0)
                 self._real = r * math.cos(rad)
                 self._imag = r * math.sin(rad)
             except ValueError:
@@ -291,13 +313,13 @@ class ComplexRow(ft.Container):
             pass
 
     def _sync_cells_to_value(self):
-        mod = math.sqrt(self._real ** 2 + self._imag ** 2)
+        mod = math.sqrt(self._real**2 + self._imag**2)
         arg = math.atan2(self._imag, self._real)
         self._cell_real.value = _fmt(self._real)
         self._cell_imag.value = _fmt(self._imag)
-        self._cell_r.value    = _fmt(mod)
-        self._cell_deg.value  = _fmt(math.degrees(arg))
-        self._cell_rad.value  = _fmt(arg)
+        self._cell_r.value = _fmt(mod)
+        self._cell_deg.value = _fmt(math.degrees(arg))
+        self._cell_rad.value = _fmt(arg)
 
     # ── Propiedad pública ──────────────────────────────────────────────────────
 
@@ -336,6 +358,7 @@ class ComplexRow(ft.Container):
 
 # ── ComplexColumn ──────────────────────────────────────────────────────────────
 
+
 class ComplexColumn(ft.Container):
     """
     Tarjeta de columna para números complejos.
@@ -356,45 +379,53 @@ class ComplexColumn(ft.Container):
         on_manage=None,
     ):
         super().__init__()
-        self.pool                  = pool
-        self.current_name          = current_name
-        self.on_change             = on_change
+        self.pool = pool
+        self.current_name = current_name
+        self.on_change = on_change
         self.available_vars_getter = available_vars_getter
-        self.themes                = themes
-        self._on_manage_cb         = on_manage
-        self._just_changed         = False
-        entry_form = str(self.pool.get(self.current_name, {}).get("form", "")).strip().lower()
-        self._display_mode         = _ENTRY_FORM_TO_MODE.get(entry_form, MODE_BINOMIAL)
-        self._focused_cell         = None
+        self.themes = themes
+        self._on_manage_cb = on_manage
+        self._just_changed = False
+        entry_form = (
+            str(self.pool.get(self.current_name, {}).get("form", "")).strip().lower()
+        )
+        self._display_mode = _ENTRY_FORM_TO_MODE.get(entry_form, MODE_BINOMIAL)
+        self._focused_cell = None
 
         t = themes.actual_theme
-        self.width          = _CARD_W
-        self.padding        = 0
-        self.border_radius  = _CARD_RADIUS
-        self.bgcolor        = _c(t, "surface")
-        self.border         = ft.Border.all(1, _c(t, "on_surface", 0.10))
-        self.shadow         = [ft.BoxShadow(
-            spread_radius=0, blur_radius=12,
-            offset=ft.Offset(0, 3),
-            color=ft.Colors.with_opacity(0.14, ft.Colors.BLACK),
-        )]
-        self.clip_behavior  = ft.ClipBehavior.ANTI_ALIAS
-        self.expand         = True
+        self.width = _CARD_W
+        self.padding = 0
+        self.border_radius = _CARD_RADIUS
+        self.bgcolor = _c(t, "surface")
+        self.border = ft.Border.all(1, _c(t, "on_surface", 0.10))
+        self.shadow = [
+            ft.BoxShadow(
+                spread_radius=0,
+                blur_radius=12,
+                offset=ft.Offset(0, 3),
+                color=ft.Colors.with_opacity(0.14, ft.Colors.BLACK),
+            )
+        ]
+        self.clip_behavior = ft.ClipBehavior.ANTI_ALIAS
+        self.expand = True
 
         self._build_ui()
 
     # ── BUILD ──────────────────────────────────────────────────────────────────
 
     def _build_ui(self):
-        t   = self.themes.actual_theme
+        t = self.themes.actual_theme
         acc = _type_accent(self._var_type(), self.themes)
 
         # ── Accent strip ───────────────────────────────────────────────────────
         self._accent_strip = ft.Container(
-            height=3, bgcolor=acc,
+            height=3,
+            bgcolor=acc,
             border_radius=ft.BorderRadius(
-                top_left=_CARD_RADIUS, top_right=_CARD_RADIUS,
-                bottom_left=0, bottom_right=0,
+                top_left=_CARD_RADIUS,
+                top_right=_CARD_RADIUS,
+                bottom_left=0,
+                bottom_right=0,
             ),
         )
 
@@ -403,7 +434,8 @@ class ComplexColumn(ft.Container):
 
         def _mgr_btn(icon, action, color=None, tooltip=""):
             return ft.IconButton(
-                icon=icon, icon_size=16,
+                icon=icon,
+                icon_size=16,
                 padding=ft.Padding.all(4),
                 tooltip=tooltip,
                 on_click=lambda e, a=action: asyncio.create_task(
@@ -413,19 +445,35 @@ class ComplexColumn(ft.Container):
                 visible=self._on_manage_cb is not None,
             )
 
-        self.move_left_btn       = _mgr_btn(ft.Icons.ARROW_BACK_IOS_NEW,     "move_left",
-                                             tooltip=tm.translate("Mover a la izquierda"))
-        self.move_right_btn      = _mgr_btn(ft.Icons.ARROW_FORWARD_IOS,      "move_right",
-                                             tooltip=tm.translate("Mover a la derecha"))
-        self.remove_from_tab_btn = _mgr_btn(ft.Icons.REMOVE_CIRCLE_OUTLINE,  "remove_from_tab",
-                                             tooltip=tm.translate("Eliminar de la pestaña"))
-        self.delete_variable_btn = _mgr_btn(ft.Icons.DELETE_OUTLINE_ROUNDED, "delete_variable",
-                                             color=ft.Colors.RED_400,
-                                             tooltip=tm.translate("Eliminar variable"))
+        self.move_left_btn = _mgr_btn(
+            ft.Icons.ARROW_BACK_IOS_NEW,
+            "move_left",
+            tooltip=tm.translate("Mover a la izquierda"),
+        )
+        self.move_right_btn = _mgr_btn(
+            ft.Icons.ARROW_FORWARD_IOS,
+            "move_right",
+            tooltip=tm.translate("Mover a la derecha"),
+        )
+        self.remove_from_tab_btn = _mgr_btn(
+            ft.Icons.REMOVE_CIRCLE_OUTLINE,
+            "remove_from_tab",
+            tooltip=tm.translate("Eliminar de la pestaña"),
+        )
+        self.delete_variable_btn = _mgr_btn(
+            ft.Icons.DELETE_OUTLINE_ROUNDED,
+            "delete_variable",
+            color=ft.Colors.RED_400,
+            tooltip=tm.translate("Eliminar variable"),
+        )
 
         self.manage_btns = ft.Row(
-            [self.move_left_btn, self.move_right_btn,
-             self.remove_from_tab_btn, self.delete_variable_btn],
+            [
+                self.move_left_btn,
+                self.move_right_btn,
+                self.remove_from_tab_btn,
+                self.delete_variable_btn,
+            ],
             spacing=2,
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
             visible=self._on_manage_cb is not None,
@@ -455,9 +503,16 @@ class ComplexColumn(ft.Container):
                     ft.Row(
                         [
                             ft.Row(
-                                [ft.Icon(ft.Icons.BLUR_CIRCULAR_ROUNDED, size=18, color=acc),
-                                 self.header_display],
-                                spacing=5, expand=True,
+                                [
+                                    ft.Icon(
+                                        ft.Icons.BLUR_CIRCULAR_ROUNDED,
+                                        size=18,
+                                        color=acc,
+                                    ),
+                                    self.header_display,
+                                ],
+                                spacing=5,
+                                expand=True,
                             ),
                             self.manage_btns,
                             self.settings_btn,
@@ -479,8 +534,13 @@ class ComplexColumn(ft.Container):
         # ── Formula badge ──────────────────────────────────────────────────────
         self.formula_badge = ft.Container(
             visible=False,
-            content=ft.Text("", size=11, weight=ft.FontWeight.W_500,
-                            overflow=ft.TextOverflow.ELLIPSIS, max_lines=1),
+            content=ft.Text(
+                "",
+                size=11,
+                weight=ft.FontWeight.W_500,
+                overflow=ft.TextOverflow.ELLIPSIS,
+                max_lines=1,
+            ),
             border_radius=6,
             padding=ft.Padding(8, 3, 8, 3),
             margin=ft.Margin(left=_PADDING, right=_PADDING, top=0, bottom=0),
@@ -497,13 +557,16 @@ class ComplexColumn(ft.Container):
 
         # ── Rows ───────────────────────────────────────────────────────────────
         self.rows_col = ft.Column(
-            spacing=6, scroll=ft.ScrollMode.ADAPTIVE, expand=True,
+            spacing=6,
+            scroll=ft.ScrollMode.ADAPTIVE,
+            expand=True,
         )
 
         # ── Add-row button (antes de _load_rows) ───────────────────────────────
         self.add_row_btn = ft.IconButton(
             icon=ft.Icons.ADD_CIRCLE_OUTLINE,
-            on_click=self._add_row, icon_size=24,
+            on_click=self._add_row,
+            icon_size=24,
             tooltip=tm.translate("Agregar fila"),
             icon_color=t["primary"],
         )
@@ -526,9 +589,14 @@ class ComplexColumn(ft.Container):
                 self.formula_badge,
                 ft.Container(
                     content=ft.Column(
-                        [self.var_dropdown,
-                         ft.Divider(height=10, thickness=0.5,
-                                    color=_c(t, "on_surface", 0.10))],
+                        [
+                            self.var_dropdown,
+                            ft.Divider(
+                                height=10,
+                                thickness=0.5,
+                                color=_c(t, "on_surface", 0.10),
+                            ),
+                        ],
                         spacing=10,
                     ),
                     padding=ft.Padding(left=_PADDING, right=_PADDING, top=4, bottom=0),
@@ -540,37 +608,53 @@ class ComplexColumn(ft.Container):
                 ),
                 self._stats_container,
                 ft.Container(
-                    content=ft.Row([self.add_row_btn],
-                                   alignment=ft.MainAxisAlignment.CENTER),
+                    content=ft.Row(
+                        [self.add_row_btn], alignment=ft.MainAxisAlignment.CENTER
+                    ),
                     padding=ft.Padding(0, 4, 0, 8),
                 ),
             ],
-            spacing=0, expand=True,
+            spacing=0,
+            expand=True,
         )
 
     # ── Mode button builder ────────────────────────────────────────────────────
 
-    def _build_mode_btn(self, mode_key, label, tooltip, icon, acc, t) -> tuple[ft.GestureDetector, ft.Container]:
+    def _build_mode_btn(
+        self, mode_key, label, tooltip, icon, acc, t
+    ) -> tuple[ft.GestureDetector, ft.Container]:
         is_active = mode_key == self._display_mode
         visual_btn = ft.Container(
             content=ft.Row(
                 [
-                    ft.Icon(icon, size=11,
-                            color=acc if is_active else _c(t, "on_surface", 0.40)),
-                    ft.Text(label, size=9,
-                            weight=ft.FontWeight.W_600 if is_active else ft.FontWeight.NORMAL,
-                            color=acc if is_active else _c(t, "on_surface", 0.50)),
+                    ft.Icon(
+                        icon,
+                        size=11,
+                        color=acc if is_active else _c(t, "on_surface", 0.40),
+                    ),
+                    ft.Text(
+                        label,
+                        size=9,
+                        weight=ft.FontWeight.W_600
+                        if is_active
+                        else ft.FontWeight.NORMAL,
+                        color=acc if is_active else _c(t, "on_surface", 0.50),
+                    ),
                 ],
-                spacing=2, tight=True,
+                spacing=2,
+                tight=True,
             ),
             padding=ft.Padding(5, 3, 5, 3),
             border_radius=5,
             tooltip=tooltip,
-            bgcolor=ft.Colors.with_opacity(0.14, acc) if is_active
-                    else ft.Colors.with_opacity(0.04, t["on_surface"]),
+            bgcolor=ft.Colors.with_opacity(0.14, acc)
+            if is_active
+            else ft.Colors.with_opacity(0.04, t["on_surface"]),
             border=ft.Border.all(
-                1, ft.Colors.with_opacity(0.45, acc) if is_active
-                   else ft.Colors.with_opacity(0.08, t["on_surface"])
+                1,
+                ft.Colors.with_opacity(0.45, acc)
+                if is_active
+                else ft.Colors.with_opacity(0.08, t["on_surface"]),
             ),
             data=mode_key,
         )
@@ -591,20 +675,30 @@ class ComplexColumn(ft.Container):
         self._apply_display_mode(mode)
 
     def _apply_display_mode(self, mode: str):
-        t   = self.themes.actual_theme
+        t = self.themes.actual_theme
         acc = _type_accent(self._var_type(), self.themes)
 
         for m, btn in self._mode_btns.items():
             is_active = m == mode
-            btn.content.controls[0].color  = acc if is_active else _c(t, "on_surface", 0.40)
-            btn.content.controls[1].weight = (ft.FontWeight.W_600 if is_active
-                                              else ft.FontWeight.NORMAL)
-            btn.content.controls[1].color  = acc if is_active else _c(t, "on_surface", 0.50)
-            btn.bgcolor = (ft.Colors.with_opacity(0.14, acc) if is_active
-                           else ft.Colors.with_opacity(0.04, t["on_surface"]))
+            btn.content.controls[0].color = (
+                acc if is_active else _c(t, "on_surface", 0.40)
+            )
+            btn.content.controls[1].weight = (
+                ft.FontWeight.W_600 if is_active else ft.FontWeight.NORMAL
+            )
+            btn.content.controls[1].color = (
+                acc if is_active else _c(t, "on_surface", 0.50)
+            )
+            btn.bgcolor = (
+                ft.Colors.with_opacity(0.14, acc)
+                if is_active
+                else ft.Colors.with_opacity(0.04, t["on_surface"])
+            )
             btn.border = ft.Border.all(
-                1, ft.Colors.with_opacity(0.45, acc) if is_active
-                   else ft.Colors.with_opacity(0.08, t["on_surface"])
+                1,
+                ft.Colors.with_opacity(0.45, acc)
+                if is_active
+                else ft.Colors.with_opacity(0.08, t["on_surface"]),
             )
             try:
                 btn.update()
@@ -667,9 +761,9 @@ class ComplexColumn(ft.Container):
     def _apply_derived_state(self):
         if not hasattr(self, "add_row_btn"):
             return
-        t     = self.themes.actual_theme
+        t = self.themes.actual_theme
         block = self._is_derived() or is_constant_type(self._var_type())
-        self.add_row_btn.disabled   = block
+        self.add_row_btn.disabled = block
         self.add_row_btn.icon_color = _c(t, "primary", 0.30) if block else t["primary"]
         try:
             self.add_row_btn.update()
@@ -679,17 +773,25 @@ class ComplexColumn(ft.Container):
     # ── Stats ──────────────────────────────────────────────────────────────────
 
     def _build_stats_row(self):
-        t      = self.themes.actual_theme
+        t = self.themes.actual_theme
         values = [_parse_complex(v) for v in self._entry_values()]
-        n      = len(values)
+        n = len(values)
 
         def chip(label, val_str):
             return ft.Column(
                 [
-                    ft.Text(label, size=9, weight=ft.FontWeight.W_600,
-                            color=_c(t, "on_surface", 0.38)),
-                    ft.Text(val_str, size=11, weight=ft.FontWeight.W_500,
-                            color=_c(t, "on_surface", 0.75)),
+                    ft.Text(
+                        label,
+                        size=9,
+                        weight=ft.FontWeight.W_600,
+                        color=_c(t, "on_surface", 0.38),
+                    ),
+                    ft.Text(
+                        val_str,
+                        size=11,
+                        weight=ft.FontWeight.W_500,
+                        color=_c(t, "on_surface", 0.75),
+                    ),
                 ],
                 spacing=1,
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
@@ -698,17 +800,24 @@ class ComplexColumn(ft.Container):
         if n == 0:
             chips = [chip("n", "—")]
         elif n == 1:
-            c   = values[0]
+            c = values[0]
             mod = abs(c)
             arg = math.degrees(math.atan2(c.imag, c.real))
-            chips = [chip("n", "1"), chip("|z|", _fmt(mod)), chip("arg", f"{_fmt(arg)}°")]
+            chips = [
+                chip("n", "1"),
+                chip("|z|", _fmt(mod)),
+                chip("arg", f"{_fmt(arg)}°"),
+            ]
         else:
-            mods   = [abs(c) for c in values]
-            args   = [math.degrees(math.atan2(c.imag, c.real)) for c in values]
+            mods = [abs(c) for c in values]
+            args = [math.degrees(math.atan2(c.imag, c.real)) for c in values]
             mean_m = sum(mods) / n
             mean_a = sum(args) / n
-            chips  = [chip("n", str(n)), chip("|z̄|", _fmt(mean_m)),
-                      chip("ārg", f"{_fmt(mean_a)}°")]
+            chips = [
+                chip("n", str(n)),
+                chip("|z̄|", _fmt(mean_m)),
+                chip("ārg", f"{_fmt(mean_a)}°"),
+            ]
 
         return ft.Row(chips, alignment=ft.MainAxisAlignment.SPACE_AROUND)
 
@@ -724,7 +833,7 @@ class ComplexColumn(ft.Container):
     def _get_latex_header(self) -> str:
         name = self.current_name
         has_special = any(ch in name for ch in ("^", "_", "\\"))
-        latex_name  = name if has_special else f"\\text{{{name}}}"
+        latex_name = name if has_special else f"\\text{{{name}}}"
         return f"$${latex_name} \\in \\mathbb{{C}}$$"
 
     def _update_header(self):
@@ -736,13 +845,14 @@ class ComplexColumn(ft.Container):
 
     def _update_formula_badge(self):
         formula = self._entry.get("formula", "").strip()
-        acc     = _type_accent(self._var_type(), self.themes)
+        acc = _type_accent(self._var_type(), self.themes)
         if formula:
             self.formula_badge.content.value = f"ƒ  {formula}"
-            self.formula_badge.content.color  = acc
-            self.formula_badge.bgcolor        = ft.Colors.with_opacity(0.10, acc)
-            self.formula_badge.border         = ft.Border.all(
-                1, ft.Colors.with_opacity(0.20, acc))
+            self.formula_badge.content.color = acc
+            self.formula_badge.bgcolor = ft.Colors.with_opacity(0.10, acc)
+            self.formula_badge.border = ft.Border.all(
+                1, ft.Colors.with_opacity(0.20, acc)
+            )
             self.formula_badge.visible = True
         else:
             self.formula_badge.visible = False
@@ -837,7 +947,7 @@ class ComplexColumn(ft.Container):
 
     def update_dropdown(self):
         self.var_dropdown.options = self.available_vars_getter()
-        self.var_dropdown.value   = self.current_name
+        self.var_dropdown.value = self.current_name
         try:
             self.var_dropdown.update()
         except Exception:
@@ -853,12 +963,12 @@ class ComplexColumn(ft.Container):
             values = values[:1]
         entry = self._entry
         entry["values"] = values
-        entry["type"]   = infer_variable_type(entry)
+        entry["type"] = infer_variable_type(entry)
 
     def sync_with_pool(self):
         """Actualiza la UI leyendo los valores del pool."""
         entry = self._entry
-        
+
         # Sincronizar modo de representación
         form = str(entry.get("form", "")).strip().lower()
         new_mode = _ENTRY_FORM_TO_MODE.get(form, MODE_BINOMIAL)
