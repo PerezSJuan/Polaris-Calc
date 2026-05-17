@@ -42,6 +42,14 @@ def test_compute_covariance():
     assert cov == 5.0
     assert unit == "m*s"
 
+def test_compute_covariance_requires_same_length():
+    with pytest.raises(ValueError, match="same length"):
+        compute_covariance([1, 2, 3], [1, 2], "m", "s")
+
+def test_compute_covariance_requires_at_least_two_points():
+    with pytest.raises(ValueError, match="at least 2 points"):
+        compute_covariance([1], [1], "m", "s")
+
 def test_compute_formula_error_few():
     # f = x^2, sigma_x = 0.1, x = 10
     # df/dx = 2x = 20
@@ -80,3 +88,34 @@ def test_error_from_series_dispatch():
     result = compute_formula_error_from_series("x^2", ["x"], series, sigma_data, units)
     assert result["mode"] == "many"
     assert result["n"] == 5
+
+def test_error_from_series_requires_equal_lengths():
+    with pytest.raises(ValueError, match="same length"):
+        compute_formula_error_from_series(
+            "x + y",
+            ["x", "y"],
+            {"x": [1, 2, 3], "y": [4, 5]},
+            {"x": (0.1, "m"), "y": (0.1, "m")},
+            {"x": "m", "y": "m"},
+        )
+
+def test_error_from_series_many_mode_computes_covariances():
+    result = compute_formula_error_from_series(
+        "x + y",
+        ["x", "y"],
+        {
+            "x": [1, 2, 3, 4, 5],
+            "y": [2, 4, 6, 8, 10],
+        },
+        {
+            "x": (0.1, "m"),
+            "y": (0.2, "m"),
+        },
+        {
+            "x": "m",
+            "y": "m",
+        },
+    )
+    assert result["mode"] == "many"
+    assert result["covariances_computed"][("x", "y")] == (5.0, "m*m")
+    assert result["sigma_f_value"] > 0.2
