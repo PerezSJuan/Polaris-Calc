@@ -17,7 +17,7 @@ math_utils_path = os.path.abspath(
 if math_utils_path not in sys.path:
     sys.path.append(math_utils_path)
 
-from function_substitution import CONSTANTS, evaluate, parse_expression
+from function_substitution_engine import CONSTANTS, evaluate, parse_expression
 
 from screens.editor.utils.utils import normalize_editor_data
 from screens.editor.components.column import EditableColumn
