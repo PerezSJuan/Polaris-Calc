@@ -1,0 +1,6 @@
+numpy
+sympy
+matplotlib
+flet
+flet-base
+flet-web

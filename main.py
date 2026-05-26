@@ -73,6 +73,14 @@ flet_config.default_language = "en"
 flet_config.translations_csv_path = os.path.join(get_assets_dir(), "translations.csv")
 flet_config.translations_csv_separator = ","
 
+flet_config.font_files = {
+    "Regular": "fonts/ComicNeue-Regular.ttf",
+    "Bold": "fonts/ComicNeue-Bold.ttf",
+    "Italic": "fonts/ComicNeue-Italic.ttf",
+    "BoldItalic": "fonts/ComicNeue-BoldItalic.ttf",
+}
+flet_config.main_font_family = "Regular"
+
 from flet_base.themes.themes import instance_themes as themes
 
 themes.__init__()  # Re-read config after updates
@@ -86,15 +94,7 @@ app = fr.FletRouter(route_init="/home")
 async def Awake(data: fr.DataSystem):
     data.page.title = "Polaris Calc"
     data.page.scroll = ft.ScrollMode.ADAPTIVE
-    data.page.fonts = {
-        "Regular": os.path.join(get_assets_dir(), "fonts", "ComicNeue-Regular.ttf"),
-        "Bold": os.path.join(get_assets_dir(), "fonts", "ComicNeue-Bold.ttf"),
-        "Italic": os.path.join(get_assets_dir(), "fonts", "ComicNeue-Italic.ttf"),
-        "BoldItalic": os.path.join(
-            get_assets_dir(), "fonts", "ComicNeue-BoldItalic.ttf"
-        ),
-    }
-    data.page.window.icon = os.path.join(get_assets_dir(), "icons", "favicon.ico")
+    data.page.window.icon = "icons/favicon.png"
     data.page.window.resizable = True
     data.page.window.min_width = 500
     data.page.window.min_height = 0
