@@ -4,3 +4,5 @@ matplotlib
 flet
 flet-base
 flet-web
+pytest
+lark

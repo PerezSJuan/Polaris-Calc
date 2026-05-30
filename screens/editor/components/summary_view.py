@@ -289,9 +289,24 @@ def _make_plot_card(
     t = getattr(themes, "actual_theme", themes if isinstance(themes, dict) else {})
     acc = t.get("formula_accent", t.get("primary", ft.Colors.BLUE))
     cfg = (entry.get("plot_config") or {}) if isinstance(entry, dict) else {}
-    pt_label = str(cfg.get("plot_type", "plot")).capitalize()
-    x_var = str(cfg.get("x_var", "—"))
-    y_var = str(cfg.get("y_var", ""))
+
+    # Migración silenciosa a multi-serie
+    if "series" not in cfg:
+        old_pt = cfg.get("plot_type", "plot")
+        old_x = cfg.get("x_var", "")
+        old_y = cfg.get("y_var", "")
+        cfg = {
+            "series": [{"label": f"{old_y} vs {old_x}" if old_y else old_x, "plot_type": old_pt, "x_var": old_x, "y_var": old_y, "color": None}],
+            "title": cfg.get("title", ""),
+            "xlabel": cfg.get("xlabel", ""),
+            "ylabel": cfg.get("ylabel", ""),
+            "regression": cfg.get("regression", "none"),
+            "show_legend": cfg.get("show_legend", True),
+            "style": cfg.get("style", "default"),
+        }
+
+    series_list = cfg.get("series", [])
+    pt_label = str(series_list[0].get("plot_type", "plot")).capitalize() if series_list else "Plot"
     reg = str(cfg.get("regression", "none"))
     description = str(entry.get("description", ""))
     reg_labels = {
@@ -384,23 +399,24 @@ def _make_plot_card(
         padding=ft.Padding(8, 2, 8, 2),
     )
 
-    vars_str = f"{x_var} → {y_var}" if y_var else x_var
-    vars_chip = ft.Row(
-        [
-            ft.Icon(
-                ft.Icons.SWAP_HORIZ_ROUNDED, size=12, color=_c(t, "on_surface", 0.35)
-            ),
-            ft.Text(
-                vars_str,
-                size=10,
-                color=_c(t, "on_surface", 0.60),
-                overflow=ft.TextOverflow.ELLIPSIS,
-                max_lines=1,
-                expand=True,
-            ),
-        ],
-        spacing=4,
-    )
+    series_chips = []
+    for sc in series_list:
+        s_x = sc.get("x_var", "—")
+        s_y = sc.get("y_var", "")
+        s_color = sc.get("color")
+        series_chips.append(
+            ft.Container(
+                content=ft.Row(
+                    [
+                        ft.Container(width=7, height=7, border_radius=4, bgcolor=s_color or _c(t, "on_surface", 0.40)),
+                        ft.Text(f"{s_x} → {s_y}" if s_y else s_x, size=9, color=_c(t, "on_surface", 0.60), max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
+                    ],
+                    spacing=4,
+                ),
+                padding=ft.Padding(0, 1, 0, 0),
+            )
+        )
+    vars_chip = ft.Column(series_chips, spacing=2)
 
     desc_text = ft.Text(
         description if description else tm.translate("Sin descripción"),

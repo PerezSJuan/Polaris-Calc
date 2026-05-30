@@ -42,6 +42,7 @@ _CARD_W = 340
 _CARD_RADIUS = 12
 
 _REGRESSION_DEGREES = {"poly2": 2, "poly3": 3}
+_NEEDS_SINGLE_H = {"histogram"}
 
 
 def _c(t, key, opacity=1.0):
@@ -49,96 +50,162 @@ def _c(t, key, opacity=1.0):
     return ft.Colors.with_opacity(opacity, col) if opacity < 1.0 else col
 
 
-def _build_figure(pool: dict, plot_name: str) -> plt.Figure | None:
-    """Construye la figura matplotlib a partir de plot_config."""
-    entry = pool.get(plot_name, {})
-    cfg = entry.get("plot_config", {})
-    if not cfg:
-        return None
-
+def _migrate_old_config(cfg: dict) -> dict:
+    """Convierte plot_config antiguo (formato plano) al nuevo multi-serie."""
+    if "series" in cfg:
+        return cfg
     pt = cfg.get("plot_type", "scatter")
     x_var = cfg.get("x_var", "")
     y_var = cfg.get("y_var", "")
     x_err_v = cfg.get("x_err_var", "")
     y_err_v = cfg.get("y_err_var", "")
+    label = f"{y_var} vs {x_var}" if y_var else x_var
+    return {
+        "series": [
+            {
+                "label": label,
+                "plot_type": pt,
+                "x_var": x_var,
+                "y_var": y_var,
+                "x_err_var": x_err_v,
+                "y_err_var": y_err_v,
+                "color": None,
+                "linestyle": "-",
+                "marker": "o" if pt == "scatter" else ("" if pt == "fill_between" else ""),
+                "linewidth": 1.5,
+            }
+        ],
+        "title": cfg.get("title", ""),
+        "xlabel": cfg.get("xlabel", x_var),
+        "ylabel": cfg.get("ylabel", y_var),
+        "regression": cfg.get("regression", "none"),
+        "show_legend": cfg.get("show_legend", True),
+        "style": cfg.get("style", "default"),
+    }
+
+
+def _build_figure(pool: dict, plot_name: str) -> plt.Figure | None:
+    """Construye la figura matplotlib a partir de plot_config (multi-serie)."""
+    entry = pool.get(plot_name, {})
+    cfg = entry.get("plot_config", {})
+    if not cfg:
+        return None
+
+    cfg = _migrate_old_config(cfg)
+
+    series_list = cfg.get("series", [])
     title = cfg.get("title", plot_name)
-    xlabel = cfg.get("xlabel", x_var)
-    ylabel = cfg.get("ylabel", y_var)
+    xlabel = cfg.get("xlabel", "")
+    ylabel = cfg.get("ylabel", "")
     reg = cfg.get("regression", "none")
     style = cfg.get("style", "default")
 
-    x_vals = pool.get(x_var, {}).get("values", []) if x_var else []
-    y_vals = pool.get(y_var, {}).get("values", []) if y_var else []
+    # Inferir etiquetas de ejes si no están definidas
+    if not xlabel:
+        x_vars = [s.get("x_var", "") for s in series_list if s.get("x_var")]
+        xlabel = x_vars[0] if x_vars else "x"
+    if not ylabel:
+        y_vars = [s.get("y_var", "") for s in series_list if s.get("y_var") and s.get("plot_type") not in _NEEDS_SINGLE_H]
+        ylabel = y_vars[0] if y_vars else "y"
 
-    if not x_vals:
-        return None
+    plot_series: list[SeriesConfig] = []
 
-    x = np.asarray(x_vals, dtype=float)
-    y = np.asarray(y_vals, dtype=float) if y_vals else None
+    for sc in series_list:
+        pt = sc.get("plot_type", "line")
+        x_var = sc.get("x_var", "")
+        y_var = sc.get("y_var", "")
+        x_err_v = sc.get("x_err_var", "")
+        y_err_v = sc.get("y_err_var", "")
 
-    # errores
-    xerr = None
-    yerr = None
-    if pt == "errorbar":
-        if x_err_v and pool.get(x_err_v, {}).get("values"):
-            xerr = np.asarray(pool[x_err_v]["values"], dtype=float)
-        if y_err_v and pool.get(y_err_v, {}).get("values"):
-            yerr = np.asarray(pool[y_err_v]["values"], dtype=float)
+        x_vals = pool.get(x_var, {}).get("values", []) if x_var else []
+        y_vals = pool.get(y_var, {}).get("values", []) if y_var else []
 
-    series: list[SeriesConfig] = []
+        if not x_vals:
+            continue
 
-    # serie principal
-    s_kwargs: dict = {}
-    if pt == "histogram":
-        s_kwargs = dict(plot_type="histogram", x=x, label=x_var)
-    elif pt == "errorbar":
-        s_kwargs = dict(
-            plot_type="errorbar",
+        x = np.asarray(x_vals, dtype=float)
+        y = np.asarray(y_vals, dtype=float) if y_vals else None
+
+        xerr = None
+        yerr = None
+        if pt == "errorbar":
+            if x_err_v and pool.get(x_err_v, {}).get("values"):
+                xerr = np.asarray(pool[x_err_v]["values"], dtype=float)
+            if y_err_v and pool.get(y_err_v, {}).get("values"):
+                yerr = np.asarray(pool[y_err_v]["values"], dtype=float)
+
+        s_kwargs: dict = dict(
+            plot_type=pt,
             x=x,
-            y=y,
-            xerr=xerr,
-            yerr=yerr,
-            label=f"{y_var} vs {x_var}",
-            marker="o",
+            label=sc.get("label", y_var or x_var),
+            color=sc.get("color") or None,
+            linestyle=sc.get("linestyle", "-") or "-",
+            linewidth=sc.get("linewidth", 1.5),
         )
-    elif pt in ("bar", "barh"):
-        s_kwargs = dict(plot_type=pt, x=x, y=y, label=f"{y_var}")
-    else:
-        s_kwargs = dict(
-            plot_type=pt, x=x, y=y, label=f"{y_var} vs {x_var}" if y_var else x_var
-        )
-    series.append(SeriesConfig(**s_kwargs))
+        s_kwargs["marker"] = sc.get("marker") or None
+        s_kwargs["markersize"] = sc.get("markersize", 6.0)
 
-    # regresión sobre scatter/line
-    if reg != "none" and y is not None and len(x) > 1:
-        try:
-            x_fit = np.linspace(x.min(), x.max(), 200)
-            if reg == "linear":
-                res = linear_regression(x, y)
-                y_fit = res.slope * x_fit + res.intercept
-                reg_label = f"Lineal  R²={res.r_squared:.3f}"
-            else:
-                deg = _REGRESSION_DEGREES.get(reg, 2)
-                res = polynomial_regression(x, y, degree=deg)
-                y_fit = np.polyval(res.coefficients, x_fit)
-                reg_label = f"Polinómica g{deg}  R²={res.r_squared:.3f}"
-            series.append(
-                SeriesConfig(
-                    plot_type="line",
-                    x=x_fit,
-                    y=y_fit,
-                    label=reg_label,
-                    linestyle="--",
-                    linewidth=1.5,
+        if pt == "histogram":
+            s_kwargs["x"] = x
+            s_kwargs.pop("y", None)
+            s_kwargs.pop("color", None)
+            s_kwargs.pop("marker", None)
+            s_kwargs.pop("linestyle", None)
+            s_kwargs["color"] = sc.get("color") or None
+        elif pt == "errorbar":
+            s_kwargs["y"] = y
+            s_kwargs["xerr"] = xerr
+            s_kwargs["yerr"] = yerr
+        else:
+            s_kwargs["y"] = y
+
+        plot_series.append(SeriesConfig(**{k: v for k, v in s_kwargs.items() if v is not None or k in ("color",)}))
+
+    # regresión (usar la primera serie con y para calcular)
+    first_y_series = next(
+        (s for s in series_list if s.get("y_var") and pool.get(s["y_var"], {}).get("values")),
+        None,
+    )
+    if reg != "none" and first_y_series:
+        y_var_reg = first_y_series["y_var"]
+        x_var_reg = first_y_series.get("x_var", "")
+        x_vals_reg = pool.get(x_var_reg, {}).get("values", [])
+        y_vals_reg = pool.get(y_var_reg, {}).get("values", [])
+        if x_vals_reg and y_vals_reg and len(x_vals_reg) > 1:
+            try:
+                x_r = np.asarray(x_vals_reg, dtype=float)
+                y_r = np.asarray(y_vals_reg, dtype=float)
+                x_fit = np.linspace(x_r.min(), x_r.max(), 200)
+                if reg == "linear":
+                    res = linear_regression(x_r, y_r)
+                    y_fit = res.slope * x_fit + res.intercept
+                    reg_label = f"Lineal  R²={res.r_squared:.3f}"
+                else:
+                    deg = _REGRESSION_DEGREES.get(reg, 2)
+                    res = polynomial_regression(x_r, y_r, degree=deg)
+                    y_fit = np.polyval(res.coefficients, x_fit)
+                    reg_label = f"Polinómica g{deg}  R²={res.r_squared:.3f}"
+                plot_series.append(
+                    SeriesConfig(
+                        plot_type="line",
+                        x=x_fit,
+                        y=y_fit,
+                        label=reg_label,
+                        linestyle="--",
+                        linewidth=1.5,
+                        color=None,
+                    )
                 )
-            )
-        except Exception:
-            pass
+            except Exception:
+                pass
+
+    if not plot_series:
+        return None
 
     fig_cfg = FigureConfig(
         subplots=[
             SubplotConfig(
-                series=series,
+                series=plot_series,
                 title=title,
                 xlabel=AxisConfig(label=xlabel),
                 ylabel=AxisConfig(label=ylabel),
@@ -402,9 +469,9 @@ class PlotColumn(ft.Container):
             bgcolor=_c(t, "on_surface", 0.02),
         )
 
-        # ── variables chips ───────────────────────────────────────────────────
-        x_var = cfg.get("x_var", "—")
-        y_var = cfg.get("y_var", "")
+        # ── variables chips (multi-serie) ──────────────────────────────────────
+        raw_cfg = _migrate_old_config(cfg)
+        series_list = raw_cfg.get("series", [])
         reg = cfg.get("regression", "none")
         reg_labels = {
             "none": "—",
@@ -413,24 +480,40 @@ class PlotColumn(ft.Container):
             "poly3": "Grado 3",
         }
 
-        info_row = ft.Container(
-            content=ft.Row(
-                [
-                    ft.Row(
+        series_chips = []
+        for sc in series_list:
+            s_x = sc.get("x_var", "—")
+            s_y = sc.get("y_var", "")
+            s_pt = sc.get("plot_type", "line")
+            s_color = sc.get("color")
+            chip_color = _c(t, "on_surface", 0.60)
+            series_chips.append(
+                ft.Container(
+                    content=ft.Row(
                         [
-                            ft.Icon(
-                                ft.Icons.SWAP_HORIZ_ROUNDED,
-                                size=12,
-                                color=_c(t, "on_surface", 0.35),
+                            ft.Container(
+                                width=8, height=8,
+                                border_radius=4,
+                                bgcolor=s_color or _c(t, "on_surface", 0.35),
                             ),
                             ft.Text(
-                                f"{x_var} → {y_var}" if y_var else x_var,
-                                size=10,
-                                color=_c(t, "on_surface", 0.60),
+                                f"{s_x} → {s_y}" if s_y else s_x,
+                                size=9,
+                                color=chip_color,
+                                max_lines=1,
+                                overflow=ft.TextOverflow.ELLIPSIS,
                             ),
                         ],
                         spacing=4,
                     ),
+                    padding=ft.Padding(0, 1, 0, 1),
+                )
+            )
+
+        info_row = ft.Container(
+            content=ft.Row(
+                [
+                    ft.Column(series_chips, spacing=2, expand=True),
                     ft.Row(
                         [
                             ft.Icon(
@@ -449,6 +532,7 @@ class PlotColumn(ft.Container):
                     type_pill,
                 ],
                 alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                vertical_alignment=ft.CrossAxisAlignment.START,
             ),
             padding=ft.Padding(14, 6, 14, 10),
         )

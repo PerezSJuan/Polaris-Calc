@@ -1,6 +1,6 @@
 """
 Modal: Crear plot
-Configura un gráfico vinculado a variables del pool.
+Configura un gráfico vinculado a variables del pool con múltiples series.
 
 Estructura generada en el pool:
     pool[nombre] = {
@@ -10,15 +10,24 @@ Estructura generada en el pool:
         "description": "...",
         "formula": "",
         "plot_config": {
-            "plot_type": "scatter",
-            "x_var": "t",
-            "y_var": "v",
-            "x_err_var": "",
-            "y_err_var": "",
+            "series": [
+                {
+                    "label": "Serie 1",
+                    "plot_type": "scatter",
+                    "x_var": "t",
+                    "y_var": "v",
+                    "x_err_var": "",
+                    "y_err_var": "",
+                    "color": "#1f77b4",
+                    "linestyle": "-",
+                    "marker": "o",
+                    "linewidth": 1.5,
+                },
+            ],
             "title": "",
             "xlabel": "",
             "ylabel": "",
-            "regression": "none",   # "none" | "linear" | "poly2" | "poly3"
+            "regression": "none",
             "show_legend": True,
             "style": "default",
         },
@@ -62,7 +71,48 @@ _STYLE_OPTIONS = [
     "grayscale",
 ]
 
-_NEEDS_XY     = {"scatter", "line", "errorbar", "bar", "barh", "step", "fill_between"}
+_COLORS = [
+    ("#1f77b4", "Azul"),
+    ("#ff7f0e", "Naranja"),
+    ("#2ca02c", "Verde"),
+    ("#d62728", "Rojo"),
+    ("#9467bd", "Púrpura"),
+    ("#8c564b", "Marrón"),
+    ("#e377c2", "Rosa"),
+    ("#7f7f7f", "Gris"),
+    ("#bcbd22", "Amarillo"),
+    ("#17becf", "Cian"),
+    ("#aec7e8", "Azul claro"),
+    ("#ffbb78", "Naranja claro"),
+    ("#98df8a", "Verde claro"),
+    ("#ff9896", "Rojo claro"),
+    ("#c5b0d5", "Lavanda"),
+    ("#9edae5", "Cian claro"),
+]
+
+_LINESTYLES = [
+    ("-", "Sólida (—)"),
+    ("--", "Discontinua (--)"),
+    ("-.", "Guión-punto (-.)"),
+    (":", "Punteada (:)"),
+    ("None", "Ninguna"),
+]
+
+_MARKERS = [
+    ("o", "Círculo (o)"),
+    ("s", "Cuadrado (s)"),
+    ("^", "Triángulo (^)"),
+    ("D", "Diamante (D)"),
+    ("v", "Triángulo invertido (v)"),
+    ("*", "Estrella (*)"),
+    ("x", "X (x)"),
+    ("+", "Cruz (+)"),
+    (".", "Punto (.)"),
+    ("|", "Línea vertical (|)"),
+    ("_", "Línea horizontal (_)"),
+    ("None", "Ninguno"),
+]
+
 _NEEDS_SINGLE = {"histogram"}
 _ALLOWS_ERRORS = {"errorbar"}
 
@@ -83,8 +133,6 @@ async def open_create_plot_modal(
     acc = t.get("formula_accent", t["primary"])
 
     available_vars = [v for v in get_available_vars() if pool.get(v, {}).get("type") != VARIABLE_TYPE_PLOT]
-    var_opts_none = [ft.DropdownOption("—")] + [ft.DropdownOption(v) for v in available_vars]
-    var_opts      = [ft.DropdownOption(v) for v in available_vars] if available_vars else [ft.DropdownOption("—")]
 
     # ── Campos básicos ────────────────────────────────────────────────────────
     name_field = text_input(placeholder=tm.translate("Nombre del plot (ej: Gráfico v-t)"))
@@ -93,26 +141,170 @@ async def open_create_plot_modal(
         multiline=True, max_lines=2,
     )
 
-    # ── Tipo de gráfico ───────────────────────────────────────────────────────
-    plot_type_dd = dropdown(
-        label=tm.translate("Tipo de gráfico"),
-        options=[ft.DropdownOption(key=k, text=tm.translate(label)) for k, label in _PLOT_TYPES],
-        value="scatter",
+    # ── Series dinámicas ──────────────────────────────────────────────────────
+    series_container = ft.Column(spacing=12, scroll=ft.ScrollMode.AUTO)
+    _series_data = []  # lista de dicts con los controles de cada serie
+
+    def _build_series_widgets(series_idx: int):
+        sv = available_vars
+        var_opts_none = [ft.DropdownOption("—")] + [ft.DropdownOption(v) for v in sv]
+        var_opts = [ft.DropdownOption(v) for v in sv] if sv else [ft.DropdownOption("—")]
+
+        label_f = text_input(
+            placeholder=tm.translate("Etiqueta (opcional)"),
+        )
+        pt_dd = dropdown(
+            label=tm.translate("Tipo"),
+            options=[ft.DropdownOption(key=k, text=tm.translate(la)) for k, la in _PLOT_TYPES],
+            value="scatter"
+        )
+        x_dd = dropdown(
+            label="X",
+            options=var_opts,
+            value=sv[0] if sv else "—"
+        )
+        y_dd = dropdown(
+            label="Y",
+            options=var_opts,
+            value=sv[1] if len(sv) > 1 else (sv[0] if sv else "—")
+        )
+        x_err_dd = dropdown(label="X err", options=var_opts_none, value="—", )
+        y_err_dd = dropdown(label="Y err", options=var_opts_none, value="—", )
+        err_row = ft.Row([x_err_dd, y_err_dd], spacing=8, visible=False)
+
+        c_dd = dropdown(
+            label=tm.translate("Color"),
+            options=[ft.DropdownOption(key=k, text=la) for k, la in _COLORS],
+            value=_COLORS[series_idx % len(_COLORS)][0]
+        )
+        ls_dd = dropdown(
+            label=tm.translate("Línea"),
+            options=[ft.DropdownOption(key=k, text=la) for k, la in _LINESTYLES],
+            value="-"
+        )
+        mk_dd = dropdown(
+            label=tm.translate("Marca"),
+            options=[ft.DropdownOption(key=k, text=la) for k, la in _MARKERS],
+            value="o"
+        )
+
+        def _on_type_change(e):
+            is_hist = pt_dd.value in _NEEDS_SINGLE
+            y_dd.visible = not is_hist
+            err_row.visible = pt_dd.value in _ALLOWS_ERRORS
+            try:
+                y_dd.update()
+                err_row.update()
+            except RuntimeError:
+                pass
+
+        pt_dd.on_change = _on_type_change
+        _on_type_change(None)
+
+        # Botón eliminar serie
+        def _make_del_handler(idx):
+            async def _del(e):
+                if len(_series_data) <= 1:
+                    return
+                _series_data.pop(idx)
+                _rebuild_series_list()
+            return _del
+
+        del_btn = ft.IconButton(
+            icon=ft.Icons.REMOVE_CIRCLE_OUTLINE,
+            icon_size=18,
+            tooltip=tm.translate("Eliminar serie"),
+            on_click=_make_del_handler(series_idx),
+            icon_color=ft.Colors.RED_400,
+            padding=ft.Padding.all(2),
+        )
+
+        return {
+            "label_f": label_f,
+            "pt_dd": pt_dd,
+            "x_dd": x_dd,
+            "y_dd": y_dd,
+            "x_err_dd": x_err_dd,
+            "y_err_dd": y_err_dd,
+            "err_row": err_row,
+            "c_dd": c_dd,
+            "ls_dd": ls_dd,
+            "mk_dd": mk_dd,
+            "del_btn": del_btn,
+            "widget": None,
+        }
+
+    def _make_series_card(idx: int, data: dict) -> ft.Container:
+        header = ft.Row(
+            [
+                ft.Text(f"{tm.translate('Serie')} {idx + 1}", size=12, weight=ft.FontWeight.W_600, color=ft.Colors.with_opacity(0.75, t["on_surface"])),
+                ft.Container(expand=True),
+                data["del_btn"],
+            ],
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+        )
+
+        # Fila superior: label + tipo
+        row1 = ft.Row([data["label_f"], data["pt_dd"]], spacing=8, vertical_alignment=ft.CrossAxisAlignment.START)
+
+        # Fila variables: X, Y
+        row2 = ft.Row([data["x_dd"], data["y_dd"]], spacing=8, visible=not (data["pt_dd"].value in _NEEDS_SINGLE))
+
+        # Fila errores
+        row3 = data["err_row"]
+
+        # Fila apariencia: color, línea, marca
+        row4 = ft.Row([data["c_dd"], data["ls_dd"], data["mk_dd"]], spacing=8)
+
+        card = ft.Container(
+            content=ft.Column([header, row1, row2, row3, row4], spacing=6),
+            bgcolor=ft.Colors.with_opacity(0.04, t["on_surface"]),
+            border_radius=8,
+            border=ft.Border.all(1, ft.Colors.with_opacity(0.10, t["on_surface"])),
+            padding=10,
+        )
+        data["widget"] = card
+        return card
+
+    def _rebuild_series_list():
+        series_container.controls.clear()
+        for i, sd in enumerate(_series_data):
+            sd["del_btn"].on_click = _make_del_handler(i)
+            series_container.controls.append(_make_series_card(i, sd))
+        try:
+            series_container.update()
+        except RuntimeError:
+            pass
+
+    def _make_del_handler(idx):
+        async def _del(e):
+            if len(_series_data) <= 1:
+                return
+            _series_data.pop(idx)
+            _rebuild_series_list()
+        return _del
+
+    # Serie inicial
+    _series_data.append(_build_series_widgets(0))
+    _rebuild_series_list()
+
+    add_series_btn = text_btn(
+        tm.translate("+ Añadir serie"),
+        on_click=lambda e: _add_series(),
     )
 
-    # ── Variables ─────────────────────────────────────────────────────────────
-    x_var_dd = dropdown(
-        label=tm.translate("Variable X"),
-        options=var_opts,
-        value=available_vars[0] if available_vars else "—",
+    def _add_series():
+        idx = len(_series_data)
+        _series_data.append(_build_series_widgets(idx))
+        _rebuild_series_list()
+
+    series_section = ft.Container(
+        content=ft.Column([
+            ft.Text(tm.translate("Series"), size=13, weight=ft.FontWeight.W_600, color=ft.Colors.with_opacity(0.75, t["on_surface"])),
+            series_container,
+            ft.Row([add_series_btn], alignment=ft.MainAxisAlignment.CENTER),
+        ], spacing=8),
     )
-    y_var_dd = dropdown(
-        label=tm.translate("Variable Y"),
-        options=var_opts,
-        value=available_vars[1] if len(available_vars) > 1 else (available_vars[0] if available_vars else "—"),
-    )
-    x_err_dd = dropdown(label=tm.translate("Error en X (opcional)"), options=var_opts_none, value="—")
-    y_err_dd = dropdown(label=tm.translate("Error en Y (opcional)"), options=var_opts_none, value="—")
 
     # ── Etiquetas ─────────────────────────────────────────────────────────────
     title_field  = text_input(placeholder=tm.translate("Título del gráfico (opcional)"))
@@ -130,22 +322,6 @@ async def open_create_plot_modal(
         options=[ft.DropdownOption(s) for s in _STYLE_OPTIONS],
         value="default",
     )
-
-    # ── Visibilidad dinámica ──────────────────────────────────────────────────
-    error_section     = ft.Container(content=ft.Row([x_err_dd, y_err_dd], spacing=10), visible=False)
-    regression_section = ft.Container(content=regression_dd, visible=True)
-
-    def _refresh_visibility():
-        pt = plot_type_dd.value
-        is_hist = pt in _NEEDS_SINGLE
-        y_var_dd.visible = not is_hist
-        error_section.visible = pt in _ALLOWS_ERRORS
-        regression_section.visible = pt in _NEEDS_XY and not is_hist
-        for ctrl in (y_var_dd, error_section, regression_section):
-            try: ctrl.update()
-            except RuntimeError: pass
-
-    plot_type_dd.on_change = lambda e: _refresh_visibility()
 
     # ── Banner de error ───────────────────────────────────────────────────────
     error_text_ctrl = ft.Text("", size=12, color=t["error"])
@@ -178,11 +354,8 @@ async def open_create_plot_modal(
             _card(name_field),
             _section_header(tm.translate("Descripción")),
             _card(desc_field),
-            _section_header(tm.translate("Tipo de gráfico")),
-            _card(plot_type_dd),
-            _section_header(tm.translate("Variables")),
-            _card(ft.Row([x_var_dd, y_var_dd], spacing=10), error_section),
-        ], spacing=0, expand=True, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+            series_section,
+        ], spacing=4, scroll=ft.ScrollMode.AUTO, expand=True, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
         visible=True, expand=True,
     )
 
@@ -191,17 +364,17 @@ async def open_create_plot_modal(
             _section_header(tm.translate("Etiquetas")),
             _card(title_field, xlabel_field, ylabel_field),
             _section_header(tm.translate("Análisis")),
-            _card(regression_section),
+            _card(regression_dd),
             _section_header(tm.translate("Estilo matplotlib")),
             _card(style_dd),
-        ], spacing=0, expand=True, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+        ], spacing=4, scroll=ft.ScrollMode.AUTO, expand=True, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
         visible=False, expand=True,
     )
 
     # ── Dots ──────────────────────────────────────────────────────────────────
     def _dot(active):
         return ft.Container(width=24 if active else 8, height=8, border_radius=4,
-                            bgcolor=acc if active else _c(0.20))
+                            bgcolor=acc if active else ft.Colors.with_opacity(0.20, t["on_surface"]))
 
     dots_row = ft.Row([_dot(True), _dot(False)], spacing=6, alignment=ft.MainAxisAlignment.CENTER)
 
@@ -253,15 +426,31 @@ async def open_create_plot_modal(
             _show_error(tm.translate("Nombre vacío o ya existente."))
             return
 
-        pt    = plot_type_dd.value
-        x_var = x_var_dd.value if x_var_dd.value != "—" else ""
-        y_var = y_var_dd.value if (y_var_dd.value != "—" and pt not in _NEEDS_SINGLE) else ""
-        x_err = x_err_dd.value if x_err_dd.value != "—" else ""
-        y_err = y_err_dd.value if y_err_dd.value != "—" else ""
+        series_list = []
+        for sd in _series_data:
+            pt = sd["pt_dd"].value
+            x_var = sd["x_dd"].value if sd["x_dd"].value != "—" else ""
+            y_var = sd["y_dd"].value if (sd["y_dd"].value != "—" and pt not in _NEEDS_SINGLE) else ""
+            x_err = sd["x_err_dd"].value if sd["x_err_dd"].value != "—" else ""
+            y_err = sd["y_err_dd"].value if sd["y_err_dd"].value != "—" else ""
+            label = sd["label_f"].value.strip() or f"{y_var or x_var} ({pt})"
 
-        if not x_var:
-            _show_error(tm.translate("Selecciona al menos la variable X."))
-            return
+            if not x_var:
+                _show_error(tm.translate("Cada serie necesita una variable X."))
+                return
+
+            series_list.append({
+                "label": label,
+                "plot_type": pt,
+                "x_var": x_var,
+                "y_var": y_var,
+                "x_err_var": x_err,
+                "y_err_var": y_err,
+                "color": sd["c_dd"].value,
+                "linestyle": sd["ls_dd"].value if sd["ls_dd"].value != "None" else "",
+                "marker": sd["mk_dd"].value if sd["mk_dd"].value != "None" else "",
+                "linewidth": 1.5,
+            })
 
         pool[plot_name] = {
             "values": [], "errors": [],
@@ -270,9 +459,7 @@ async def open_create_plot_modal(
             "description": desc_field.value.strip(),
             "formula": "",
             "plot_config": {
-                "plot_type": pt,
-                "x_var": x_var, "y_var": y_var,
-                "x_err_var": x_err, "y_err_var": y_err,
+                "series": series_list,
                 "title":  title_field.value.strip(),
                 "xlabel": xlabel_field.value.strip(),
                 "ylabel": ylabel_field.value.strip(),
