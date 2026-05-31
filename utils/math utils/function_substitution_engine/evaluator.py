@@ -137,11 +137,12 @@ def _matmul(left, right):
     inner = len(left[0])
     if any(len(row) != inner for row in left):
         raise ShapeMismatchError("Jagged left matrix", r"\matmul")
-    if any(len(row) != len(right[0]) for row in right):
-        pass
+    right_inner = len(right[0])
+    if any(len(row) != right_inner for row in right):
+        raise ShapeMismatchError("Jagged right matrix", r"\matmul")
     if inner != len(right):
         raise ShapeMismatchError("Matrix shapes are incompatible for multiplication", r"\matmul")
-    cols = len(right[0])
+    cols = right_inner
     return [[sum(left[i][k] * right[k][j] for k in range(inner)) for j in range(cols)] for i in range(rows)]
 
 
@@ -209,17 +210,12 @@ def evaluate_node(node: ResolvedNode) -> EvalResult:
         return _binary_elemwise(node.node.operator, left, right, check_type_compatibility(node.node.operator, [_descriptor_from_result(left), _descriptor_from_result(right)]), str(node.node))
     if isinstance(node.node, FuncNode):
         operands = [evaluate_node(child) for child in node.children]
-        output_type = check_type_compatibility(node.operation, [_descriptor_from_result(operand) for operand in operands])
-        if len(operands) != node.operation.arity:
-            raise ArityMismatchError(f"Operation '{node.operation.name}' expects {node.operation.arity} arguments", str(node.node))
-        if node.operation.name == r"\matmul":
-            [left, right], warnings = operands, []
-            if len(left.value[0]) != len(right.value):
-                raise ShapeMismatchError("Matrix shapes are incompatible for multiplication", str(node.node))
-            value = _matmul(left.value, right.value)
-            unit = combine_units(left.unit, right.unit, "*") if node.operation.preserves_units else "1"
-            return _result(value, unit, output_type, [*left.warnings, *right.warnings, *warnings], [*left.index_errors, *right.index_errors])
-        if node.operation.preserves_units:
+        operand_descs = [_descriptor_from_result(operand) for operand in operands]
+        output_type = check_type_compatibility(node.operation, operand_descs)
+        if node.operation.unit_rule is not None:
+            base_unit = node.operation.unit_rule(operand_descs)
+            harmonized, warnings = operands, []
+        elif node.operation.preserves_units:
             harmonized, warnings = harmonize_additive_units(operands, str(node.node))
             base_unit = harmonized[0].unit if harmonized else "1"
         else:

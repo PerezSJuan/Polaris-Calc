@@ -36,7 +36,16 @@ def resolve_node(
             return ResolvedNode(node=node, children=[], symbol=builtin_constants[node.name])
         raise UndefinedSymbolError(f"Undefined symbol: '{node.name}'", str(node))
     if isinstance(node, FuncNode):
-        op = operations.get(node.latex_name or node.name) or operations.get(node.name)
+        candidates = []
+        for raw in (node.latex_name, node.name):
+            if not raw:
+                continue
+            candidates.append(raw)
+            if raw.startswith("\\"):
+                candidates.append(raw[1:])
+            else:
+                candidates.append(f"\\{raw}")
+        op = next((operations[name] for name in candidates if name in operations), None)
         if op is None:
             raise UnknownOperationError(f"Unknown operation: '{node.latex_name or node.name}'", str(node))
         return ResolvedNode(

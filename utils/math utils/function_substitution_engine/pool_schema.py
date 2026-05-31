@@ -134,17 +134,35 @@ def normalize_builtin_constants() -> dict[str, PoolValue]:
 
 
 def normalize_operations(operations: dict | None) -> dict[str, OperationSpec]:
-    merged = dict(DEFAULT_OPERATIONS)
+    merged: dict[str, OperationSpec] = {}
+
+    def register(name: str, spec: OperationSpec):
+        merged[name] = spec
+        for alias in spec.aliases:
+            merged[alias] = spec
+        if name.startswith("\\"):
+            merged[name[1:]] = spec
+        elif name:
+            merged[f"\\{name}"] = spec
+
+    for name, spec in DEFAULT_OPERATIONS.items():
+        register(name, spec)
     for name, spec in (operations or {}).items():
         if isinstance(spec, OperationSpec):
-            merged[name] = spec
+            register(name, spec)
             continue
-        merged[name] = OperationSpec(
+        normalized = OperationSpec(
             name=name,
             fn=spec["fn"],
-            arity=spec["arity"],
+            arity=spec.get("arity"),
             input_types=spec.get("input_types"),
             output_type=spec.get("output_type", VARIABLE_TYPE_CONSTANT_NO_ERROR),
             preserves_units=spec.get("preserves_units", True),
+            min_arity=spec.get("min_arity"),
+            max_arity=spec.get("max_arity"),
+            aliases=tuple(spec.get("aliases", ())),
+            validator=spec.get("validator"),
+            unit_rule=spec.get("unit_rule"),
         )
+        register(name, normalized)
     return merged

@@ -227,6 +227,41 @@ def test_evaluate_matrix_power_requires_integer_exponent():
         )
 
 
+def test_evaluate_matrix_determinant():
+    result = evaluate(
+        "det(A)",
+        {
+            "A": {"type": "matrix", "value": [[1.0, 2.0], [3.0, 4.0]], "unit": "m"},
+        },
+        target_unit="m^2",
+    )
+    assert result.type == "complex"
+    assert result.value == pytest.approx(-2.0)
+    assert result.unit == "m^2"
+
+
+def test_validate_reports_matrix_shape_mismatch_for_determinant():
+    report = validate(
+        "det(A)",
+        {
+            "A": {"type": "matrix", "value": [[1.0, 2.0, 3.0]], "unit": "m"},
+        },
+    )
+    assert report.valid is False
+    assert any(issue.code == "SHAPE_MISMATCH" for issue in report.errors)
+
+
+def test_validate_reports_dimension_mismatch_for_dimensionless_function():
+    report = validate(
+        "imexp(x)",
+        {
+            "x": (1.0, "m"),
+        },
+    )
+    assert report.valid is False
+    assert any(issue.code == "DIMENSION_MISMATCH" for issue in report.errors)
+
+
 def test_evaluate_unknown_operation_raises():
     with pytest.raises(UnknownOperationError):
         evaluate(r"\mystery(x)", {"x": (1.0, "m")}, mode="latex")

@@ -66,13 +66,28 @@ def validate(
             except Exception as exc:
                 errors.append(_error(getattr(exc, "code", "TYPE_MISMATCH"), str(exc), str(node)))
                 return None
-            if resolved.operation.arity != len(available):
-                errors.append(_error("ARITY_MISMATCH", f"Expected {resolved.operation.arity} arguments", str(node)))
+            if resolved.operation.arity is not None:
+                if resolved.operation.arity != len(available):
+                    errors.append(_error("ARITY_MISMATCH", f"Expected {resolved.operation.arity} arguments", str(node)))
+            else:
+                min_arity = resolved.operation.min_arity or 0
+                max_arity = resolved.operation.max_arity
+                if len(available) < min_arity or (max_arity is not None and len(available) > max_arity):
+                    if max_arity is None:
+                        errors.append(_error("ARITY_MISMATCH", f"Expected at least {min_arity} arguments", str(node)))
+                    else:
+                        errors.append(_error("ARITY_MISMATCH", f"Expected between {min_arity} and {max_arity} arguments", str(node)))
             if any(desc.canonical in {"column", "vector", "matrix"} for desc in available) and any(desc.canonical == "scalar" for desc in available):
                 warnings.append(_warning("IMPLICIT_BROADCAST", "Scalar input will be broadcast across a structured operand", str(node)))
             if any(desc.canonical in {"column", "vector"} for desc in available):
                 warnings.append(_warning("COLUMN_LENGTH_UNKNOWN", "Column lengths are validated during evaluation", str(node)))
-            return TypeDescriptor(type=output_type, unit=available[0].unit if resolved.operation.preserves_units and available else "1")
+            if resolved.operation.unit_rule is not None:
+                unit = resolved.operation.unit_rule(available)
+            elif resolved.operation.preserves_units and available:
+                unit = available[0].unit
+            else:
+                unit = "1"
+            return TypeDescriptor(type=output_type, unit=unit)
         if isinstance(node, AddNode):
             child_descs = [walk(child) for child in node.operands]
             available = [desc for desc in child_descs if desc is not None]

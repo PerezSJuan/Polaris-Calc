@@ -12,7 +12,7 @@ from .variable_types_compat import (
     VARIABLE_TYPE_MATRIX,
 )
 
-from .eval_types import ArityMismatchError, NonIntegerExponentError, ShapeMismatchError, TypeMismatchError
+from .eval_types import ArityMismatchError, DimensionMismatchError, NonIntegerExponentError, ShapeMismatchError, TypeMismatchError
 from .pool_schema import OperationSpec, PoolValue, canonical_type
 
 
@@ -46,11 +46,26 @@ def _scalarish(kind: str) -> bool:
     return kind in {"scalar", "complex"}
 
 
+def _check_arity(op: OperationSpec, operand_count: int) -> None:
+    if op.arity is not None:
+        if operand_count != op.arity:
+            raise ArityMismatchError(f"Operation '{op.name}' expects {op.arity} arguments, got {operand_count}", op.name)
+        return
+    min_arity = op.min_arity or 0
+    max_arity = op.max_arity
+    if operand_count < min_arity or (max_arity is not None and operand_count > max_arity):
+        if max_arity is None:
+            raise ArityMismatchError(f"Operation '{op.name}' expects at least {min_arity} arguments, got {operand_count}", op.name)
+        raise ArityMismatchError(
+            f"Operation '{op.name}' expects between {min_arity} and {max_arity} arguments, got {operand_count}",
+            op.name,
+        )
+
+
 def check_type_compatibility(op: str | OperationSpec, operands: list[TypeDescriptor]) -> str:
     kinds = [operand.canonical for operand in operands]
     if isinstance(op, OperationSpec):
-        if len(operands) != op.arity:
-            raise ArityMismatchError(f"Operation '{op.name}' expects {op.arity} arguments, got {len(operands)}", op.name)
+        _check_arity(op, len(operands))
         if isinstance(op.input_types, list):
             for idx, allowed in enumerate(op.input_types):
                 if not _match_allowed(operands[idx].type, allowed):
@@ -59,6 +74,8 @@ def check_type_compatibility(op: str | OperationSpec, operands: list[TypeDescrip
             for operand in operands:
                 if not _match_allowed(operand.type, op.input_types):
                     raise TypeMismatchError(f"Operation '{op.name}' does not accept type '{operand.type}'", op.name)
+        if op.validator is not None:
+            op.validator(operands)
         return op.output_type
 
     if any(kind.startswith("boolean") for kind in kinds) and op in {"+", "-", "*", "/", "^"}:
@@ -89,6 +106,13 @@ def check_type_compatibility(op: str | OperationSpec, operands: list[TypeDescrip
         if (left == "scalar" and right in {"column", "matrix", "vector"}) or (right == "scalar" and left in {"column", "matrix", "vector"}):
             return operands[0].type if left != "scalar" else operands[1].type
         raise TypeMismatchError(f"Unsupported operand types for '*': {left}, {right}", op)
+
+    if op == "@":
+        if left != "matrix" or right != "matrix":
+            raise TypeMismatchError(f"Unsupported operand types for '@': {left}, {right}", op)
+        if left_shape and right_shape and len(left_shape) == 2 and len(right_shape) == 2 and left_shape[1] != right_shape[0]:
+            raise ShapeMismatchError("Matrix shapes are incompatible for multiplication", op)
+        return VARIABLE_TYPE_MATRIX
 
     if op == "/":
         if _scalarish(left) and _scalarish(right):
