@@ -81,6 +81,8 @@ def validate(
                 warnings.append(_warning("IMPLICIT_BROADCAST", "Scalar input will be broadcast across a structured operand", str(node)))
             if any(desc.canonical in {"column", "vector"} for desc in available):
                 warnings.append(_warning("COLUMN_LENGTH_UNKNOWN", "Column lengths are validated during evaluation", str(node)))
+            if resolved.operation.result_type_rule is not None:
+                output_type = resolved.operation.result_type_rule(available)
             if resolved.operation.unit_rule is not None:
                 unit = resolved.operation.unit_rule(available)
             elif resolved.operation.preserves_units and available:

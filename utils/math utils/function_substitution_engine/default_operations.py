@@ -27,6 +27,7 @@ class OperationSpec:
     min_arity: int | None = None
     max_arity: int | None = None
     aliases: tuple[str, ...] = ()
+    result_type_rule: Callable[[list[Any]], str] | None = None
     validator: Callable[[list[Any]], None] | None = None
     unit_rule: Callable[[list[Any]], str] | None = None
 
@@ -56,6 +57,7 @@ def _spec(
     min_arity: int | None = None,
     max_arity: int | None = None,
     aliases: tuple[str, ...] = (),
+    result_type_rule: Callable[[list[Any]], str] | None = None,
     validator: Callable[[list[Any]], None] | None = None,
     unit_rule: Callable[[list[Any]], str] | None = None,
 ) -> OperationSpec:
@@ -69,6 +71,7 @@ def _spec(
         min_arity=min_arity,
         max_arity=max_arity,
         aliases=aliases,
+        result_type_rule=result_type_rule,
         validator=validator,
         unit_rule=unit_rule,
     )
@@ -115,6 +118,12 @@ def _unit_rule_same_unit(operands) -> str:
 
 def _unit_rule_dimensionless(operands) -> str:
     return "1"
+
+
+def _result_type_matrix_or_scalar(operands) -> str:
+    if operands and operands[0].canonical == "matrix":
+        return VARIABLE_TYPE_COMPLEX
+    return VARIABLE_TYPE_CONSTANT_NO_ERROR
 
 
 def _unit_rule_determinant(operands) -> str:
@@ -166,6 +175,14 @@ def _norm(value):
     return abs(value)
 
 
+def _bar_dispatch(value):
+    if isinstance(value, list):
+        if value and isinstance(value[0], list):
+            return GEOMETRY.mdeterm(value)
+        return _norm(value)
+    return GEOMETRY.absolute(value)
+
+
 DEFAULT_OPERATIONS = {
     "sum": _spec(
         "sum",
@@ -193,6 +210,22 @@ DEFAULT_OPERATIONS = {
         output_type=VARIABLE_TYPE_CONSTANT_NO_ERROR,
         aliases=("absolute",),
         preserves_units=True,
+    ),
+    "bar": _spec(
+        "bar",
+        _bar_dispatch,
+        arity=1,
+        input_types={"scalar", "complex", "column", "vector", "matrix"},
+        output_type=VARIABLE_TYPE_CONSTANT_NO_ERROR,
+        aliases=("|",),
+        preserves_units=False,
+        result_type_rule=_result_type_matrix_or_scalar,
+        validator=lambda operands: _square_matrix_validator("bar")(operands)
+        if operands and operands[0].canonical == "matrix"
+        else None,
+        unit_rule=lambda operands: _unit_rule_determinant(operands)
+        if operands and operands[0].canonical == "matrix"
+        else _unit_rule_same_unit(operands),
     ),
     "sign": _spec(
         "sign",
@@ -552,6 +585,7 @@ DEFAULT_OPERATIONS = {
         input_types={"matrix"},
         output_type=VARIABLE_TYPE_MATRIX,
         preserves_units=False,
+        result_type_rule=lambda operands: VARIABLE_TYPE_MATRIX,
         unit_rule=_unit_rule_same_unit,
     ),
     "identity": _spec(

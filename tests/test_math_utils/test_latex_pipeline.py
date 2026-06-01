@@ -27,5 +27,11 @@ def test_parse_latex_supports_grouped_algebraic_expression():
     assert sp.simplify(expr - (x + 1) ** 2) == 0
 
 
+def test_parse_latex_supports_absolute_value_bars():
+    expr = parse_latex(r"\left|x\right|")
+    x = sp.Symbol("x")
+    assert expr == sp.Abs(x)
+
+
 def test_compute_derivative_handles_fraction_expression():
     assert compute_derivative(r"\frac{1}{x}", "x") == "- \\frac{1}{x^{2}}"

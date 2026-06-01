@@ -285,6 +285,9 @@ def check_dimensions(expr, variables: dict, extra_constants: dict | None = None,
             return "bool"
         if isinstance(resolved_node.node, FuncNode):
             operand_units = [walk(child) for child in resolved_node.children]
+            if resolved_node.operation.unit_rule is not None:
+                operand_descs = [_descriptor_from_result(evaluate_node(child)) for child in resolved_node.children]
+                return resolved_node.operation.unit_rule(operand_descs)
             if resolved_node.operation.preserves_units and operand_units:
                 base = operand_units[0]
                 for unit in operand_units[1:]:

@@ -162,6 +162,10 @@ fig = quick_line([1, 2], [10, 20], title="Test", xlabel="X", ylabel="Y")
 
 ---
 
+## Related Documentation
+
+- [Function Substitution Parser Guide](./function_substitution_parser.md)
+
 ## 7. Troubleshooting
 
 | Error | Cause | Solution |

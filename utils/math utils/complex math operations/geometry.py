@@ -878,16 +878,11 @@ def lcm(*numbers: int) -> int:
 
 # ── Summation helpers ─────────────────────────────────────────────────────────
 
+def mean(elements: list) -> float:
+    return sum(elements) / len(elements)
+
+
 def sum_values(elements: list) -> float:
-    """
-    Returns the sum of a list of numbers.
-
-    Args:
-        elements: List of numeric values.
-
-    Returns:
-        The arithmetic sum of all elements.
-    """
     return sum(elements)
 
 

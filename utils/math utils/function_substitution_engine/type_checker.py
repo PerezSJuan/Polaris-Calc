@@ -76,6 +76,8 @@ def check_type_compatibility(op: str | OperationSpec, operands: list[TypeDescrip
                     raise TypeMismatchError(f"Operation '{op.name}' does not accept type '{operand.type}'", op.name)
         if op.validator is not None:
             op.validator(operands)
+        if op.result_type_rule is not None:
+            return op.result_type_rule(operands)
         return op.output_type
 
     if any(kind.startswith("boolean") for kind in kinds) and op in {"+", "-", "*", "/", "^"}:

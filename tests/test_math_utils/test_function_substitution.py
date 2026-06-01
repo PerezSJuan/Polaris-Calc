@@ -37,6 +37,13 @@ def test_parse_latex_to_ast_custom_function():
     ast = parse_latex_to_ast(r"\sum(x)", operation_names=[r"\sum"])
     assert str(ast) == r"\sum(x)"
 
+
+def test_parse_latex_to_ast_supports_bar_and_transpose_notation():
+    ast = parse_latex_to_ast(r"|x| + B^t")
+    assert "bar(" in str(ast)
+    assert "transpose(" in str(ast)
+
+
 def test_evaluate_basic():
     variables = {"x": (10, "m"), "y": (5, "m")}
     val, unit = evaluate("x + y", variables)
@@ -240,12 +247,47 @@ def test_evaluate_matrix_determinant():
     assert result.unit == "m^2"
 
 
+def test_evaluate_bar_notation_uses_determinant_for_matrix():
+    result = evaluate(
+        r"|A|",
+        {
+            "A": {"type": "matrix", "value": [[1.0, 2.0], [3.0, 4.0]], "unit": "m"},
+        },
+        mode="latex",
+    )
+    assert result.type == "complex"
+    assert result.value == pytest.approx(-2.0)
+
+
+def test_evaluate_bar_notation_uses_absolute_value_for_scalars():
+    result = evaluate(
+        r"|-3|",
+        {},
+        mode="latex",
+    )
+    assert result.value == 3.0
+    assert result.unit == "1"
+
+
+def test_evaluate_transpose_notation():
+    result = evaluate(
+        r"B^t",
+        {
+            "B": {"type": "matrix", "value": [[1.0, 2.0], [3.0, 4.0]], "unit": "m"},
+        },
+        mode="latex",
+    )
+    assert result.type == "matrix"
+    assert result.value == [[1.0, 3.0], [2.0, 4.0]]
+
+
 def test_validate_reports_matrix_shape_mismatch_for_determinant():
     report = validate(
-        "det(A)",
+        r"|A|",
         {
             "A": {"type": "matrix", "value": [[1.0, 2.0, 3.0]], "unit": "m"},
         },
+        mode="latex",
     )
     assert report.valid is False
     assert any(issue.code == "SHAPE_MISMATCH" for issue in report.errors)
@@ -260,6 +302,18 @@ def test_validate_reports_dimension_mismatch_for_dimensionless_function():
     )
     assert report.valid is False
     assert any(issue.code == "DIMENSION_MISMATCH" for issue in report.errors)
+
+
+def test_validate_reports_transpose_requires_matrix():
+    report = validate(
+        r"x^t",
+        {
+            "x": (1.0, "m"),
+        },
+        mode="latex",
+    )
+    assert report.valid is False
+    assert any(issue.code == "TYPE_MISMATCH" for issue in report.errors)
 
 
 def test_evaluate_unknown_operation_raises():

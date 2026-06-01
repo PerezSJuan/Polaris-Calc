@@ -161,6 +161,7 @@ def normalize_operations(operations: dict | None) -> dict[str, OperationSpec]:
             min_arity=spec.get("min_arity"),
             max_arity=spec.get("max_arity"),
             aliases=tuple(spec.get("aliases", ())),
+            result_type_rule=spec.get("result_type_rule"),
             validator=spec.get("validator"),
             unit_rule=spec.get("unit_rule"),
         )
