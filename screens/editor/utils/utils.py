@@ -7,8 +7,8 @@ from utils.variable_types import (
 
 
 def _load_module(relative_path: str, module_name: str):
-    """Load a module from utils/math utils/ by path (spaces in dirname)."""
-    path = Path(__file__).parents[3] / "utils" / "math utils" / relative_path
+    """Load a module from utils/math_utils/ by path."""
+    path = Path(__file__).parents[3] / "utils" / "math_utils" / relative_path
     spec = importlib.util.spec_from_file_location(module_name, path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
@@ -28,9 +28,9 @@ def load_smart_format():
 
 
 def load_default_units() -> dict:
-    """Load default_units from utils/math utils/unit conversor/default_units.py."""
+    """Load default_units from utils/math_utils/unit_conversor/default_units.py."""
     units_path = (
-        Path(__file__).parents[3] / "utils" / "math utils" / "unit conversor" / "default_units.py"
+        Path(__file__).parents[3] / "utils" / "math_utils" / "unit_conversor" / "default_units.py"
     )
     if not units_path.exists():
         return {}

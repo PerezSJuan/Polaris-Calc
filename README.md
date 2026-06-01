@@ -93,14 +93,14 @@ Polaris-Calc/
 ├── utils/            # Lógica de cálculo y utilidades del sistema
 │   ├── file_utils.py # Lectura/Escritura y normalización de archivos de proyecto (.plc)
 │   ├── variable_types.py # Definición de los tipos y estados de las variables
-│   └── math utils/   # El motor matemático central
+│   └── math_utils/   # El motor matemático central
 │       ├── derivatives.py          # Cálculo simbólico de derivadas con SymPy
 │       ├── sympy_latex_parser.py   # Parseador de fórmulas en sintaxis LaTeX
 │       ├── number_unit_parser.py   # Entrada inteligente de datos (número + unidad)
 │       ├── uncertain_calculator.py # Propagación de incertidumbre de acuerdo con el GUM
-│       ├── unit conversor/         # Conversor de unidades de física y dimensiones SI
+│       ├── unit_conversor/         # Conversor de unidades de física y dimensiones SI
 │       ├── plotter/                # Wrapper configurable sobre Matplotlib
-│       └── complex math operations/# Módulos avanzados para matemáticas complejas
+│       └── complex_math_operations/# Módulos avanzados para matemáticas complejas
 └── tests/            # Suite de pruebas unitarias para el motor matemático
 ```
 

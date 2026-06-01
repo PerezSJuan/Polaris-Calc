@@ -6,7 +6,7 @@ from typing import Any
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 math_utils_dir = os.path.dirname(current_dir)
-unit_conv_path = os.path.join(math_utils_dir, "unit conversor")
+unit_conv_path = os.path.join(math_utils_dir, "unit_conversor")
 if unit_conv_path not in sys.path:
     sys.path.append(unit_conv_path)
 

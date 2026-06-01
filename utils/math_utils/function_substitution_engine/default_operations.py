@@ -33,7 +33,7 @@ class OperationSpec:
 
 
 def _load_math_module(module_name: str, filename: str):
-    module_path = Path(__file__).resolve().parent.parent / "complex math operations" / filename
+    module_path = Path(__file__).resolve().parent.parent / "complex_math_operations" / filename
     spec = util.spec_from_file_location(f"function_substitution_engine.{module_name}", module_path)
     if spec is None or spec.loader is None:
         raise ImportError(f"Unable to load math module '{filename}'")

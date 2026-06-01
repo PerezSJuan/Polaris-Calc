@@ -1,6 +1,6 @@
 # Polaris-Calc Math Utilities: Comprehensive Technical Manual
 
-This document provides an exhaustive reference for the `utils/math utils/` package. These modules form a state-of-the-art computational engine designed for scientific rigor, international flexibility, and experimental data analysis.
+This document provides an exhaustive reference for the `utils/math_utils/` package. These modules form a state-of-the-art computational engine designed for scientific rigor, international flexibility, and experimental data analysis.
 
 ---
 

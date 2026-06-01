@@ -12,7 +12,7 @@ from flet_base.components.modals import modal
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 math_utils_path = os.path.abspath(
-    os.path.join(current_dir, "..", "..", "utils", "math utils")
+    os.path.join(current_dir, "..", "..", "utils", "math_utils")
 )
 if math_utils_path not in sys.path:
     sys.path.append(math_utils_path)

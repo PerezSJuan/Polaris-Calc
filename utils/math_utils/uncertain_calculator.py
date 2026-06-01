@@ -3,9 +3,9 @@ import sys
 import sympy as sp
 from sympy.parsing.latex.lark import parse_latex_lark
 
-# Add 'unit conversor' to path (same pattern as function_substitution.py)
+# Add 'unit_conversor' to path (same pattern as function_substitution.py)
 current_dir = os.path.dirname(os.path.abspath(__file__))
-unit_conv_path = os.path.join(current_dir, "unit conversor")
+unit_conv_path = os.path.join(current_dir, "unit_conversor")
 if unit_conv_path not in sys.path:
     sys.path.append(unit_conv_path)
 

@@ -19,10 +19,10 @@ import base64
 import asyncio
 from flet_base.translations import instance_translation_manager as tm
 
-# ── math utils en el path ────────────────────────────────────────────────────
+# ── math_utils en el path ────────────────────────────────────────────────────
 _current_dir = os.path.dirname(os.path.abspath(__file__))
 _math_utils_path = os.path.abspath(
-    os.path.join(_current_dir, "..", "..", "..", "utils", "math utils")
+    os.path.join(_current_dir, "..", "..", "..", "utils", "math_utils")
 )
 if _math_utils_path not in sys.path:
     sys.path.append(_math_utils_path)

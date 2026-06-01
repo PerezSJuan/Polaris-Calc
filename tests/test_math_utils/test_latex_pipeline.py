@@ -6,7 +6,7 @@ import sympy as sp
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.abspath(os.path.join(current_dir, "../../"))
-utils_path = os.path.join(project_root, "utils", "math utils")
+utils_path = os.path.join(project_root, "utils", "math_utils")
 
 if utils_path not in sys.path:
     sys.path.append(utils_path)
