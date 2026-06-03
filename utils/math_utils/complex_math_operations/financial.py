@@ -202,8 +202,10 @@ def cumipmt(rate: float, nper: float, pv: float, start_period: int,
         raise ValueError(
             "start_period and end_period must satisfy 1 ≤ start ≤ end ≤ nper."
         )
-    when = 1 if payment_at_beginning else 0
-    return float(npf.cumipmt(rate, nper, pv, start_period, end_period, when=when))
+    total = 0.0
+    for per in range(start_period, end_period + 1):
+        total += ipmt(rate, per, nper, pv, 0, payment_at_beginning)
+    return total
 
 
 def cumprinc(rate: float, nper: float, pv: float, start_period: int,
@@ -233,8 +235,10 @@ def cumprinc(rate: float, nper: float, pv: float, start_period: int,
         raise ValueError(
             "start_period and end_period must satisfy 1 ≤ start ≤ end ≤ nper."
         )
-    when = 1 if payment_at_beginning else 0
-    return float(npf.cumprinc(rate, nper, pv, start_period, end_period, when=when))
+    total = 0.0
+    for per in range(start_period, end_period + 1):
+        total += ppmt(rate, per, nper, pv, 0, payment_at_beginning)
+    return total
 
 
 def ispmt(rate: float, per: int, nper: float, pv: float) -> float:
@@ -911,18 +915,20 @@ def dollarde(fractional_dollar: float, fraction: int) -> float:
         raise ValueError("fraction must be a positive integer.")
     integer_part = int(fractional_dollar)
     fractional_part = fractional_dollar - integer_part
-    return integer_part + fractional_part / fraction * 10 ** len(
-        str(int(round(fractional_part * 10 ** 10))).lstrip("0") or "1"
-    ) / 10 ** len(
-        str(int(round(fractional_part * 10 ** 10))).lstrip("0") or "1"
-    ) * fraction / fraction
+    s = f"{fractional_part:.10f}".rstrip("0").rstrip(".")
+    if "." in s:
+        frac_str = s.split(".")[1]
+    else:
+        frac_str = "0"
+    numerator = int(frac_str) if frac_str else 0
+    return integer_part + numerator / fraction
 
 
 def dollarfr(decimal_dollar: float, fraction: int) -> float:
     """
     Converts a dollar price expressed as a decimal into a fractional notation.
 
-    For example, 1.25 in eighths (fraction=8) = 1.02 (meaning 1 + 2/8).
+    For example, 1.25 in eighths (fraction=8) = 1.2 (meaning 1 + 2/8).
 
     Args:
         decimal_dollar: The price as a decimal number.
@@ -938,7 +944,9 @@ def dollarfr(decimal_dollar: float, fraction: int) -> float:
         raise ValueError("fraction must be a positive integer.")
     integer_part = int(decimal_dollar)
     decimal_part = decimal_dollar - integer_part
-    return integer_part + decimal_part * fraction / 10 ** len(str(fraction))
+    numerator = int(round(decimal_part * fraction))
+    digits = len(str(fraction))
+    return integer_part + numerator / (10 ** digits)
 
 
 # ── Accrued-interest & coupon helpers ─────────────────────────────────────────

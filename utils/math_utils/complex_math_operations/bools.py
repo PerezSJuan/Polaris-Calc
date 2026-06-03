@@ -192,16 +192,6 @@ def is_number(value) -> bool:
     return isinstance(value, (int, float, complex)) and not isinstance(value, bool)
 
 
-def is_text(value) -> bool:
-    """Check if value is a string. Args: value."""
-    return isinstance(value, str)
-
-
-def is_non_text(value) -> bool:
-    """Check if value is not a string. Args: value."""
-    return not isinstance(value, str)
-
-
 def is_even(number: int) -> bool:
     """Check if an integer is even. Args: number."""
     return isinstance(number, int) and number % 2 == 0
