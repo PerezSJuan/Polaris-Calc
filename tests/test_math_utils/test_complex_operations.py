@@ -89,7 +89,7 @@ from bools import (
     equal, not_equal, greater_than, less_than, greater_equal, less_equal,
     and_all, or_any, xor_all, not_all,
     elementwise_and, elementwise_or, elementwise_xor,
-    is_true, is_false, is_number, is_text, is_non_text,
+    is_true, is_false, is_number,
     is_even, is_odd, is_blank, is_logical,
     count_true, count_false, is_error,
     and_ifs, or_ifs,
@@ -525,9 +525,6 @@ class TestBoolExtended:
         assert less_than(3, 5)
         assert not less_than(5, 3)
 
-    def test_is_text(self):
-        assert is_text("hello")
-        assert not is_text(42)
 
     def test_is_error(self):
         assert is_error(ValueError("test"))
