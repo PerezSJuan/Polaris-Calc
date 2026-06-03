@@ -1237,3 +1237,23 @@ def z_score_population (data: list, value: float) -> float:
     mean = np.mean(data)
     std = np.std(data, ddof=0)
     return (value - mean) / std if std != 0 else 0
+
+
+def kurtosis (data: list) -> float:
+    """Compute the excess kurtosis of a dataset (normal distribution → 0).
+
+    Args:
+        data: List of numeric values.
+
+    Returns:
+        The excess kurtosis (Fisher kurtosis).
+    """
+    n = len(data)
+    if n < 4:
+        return float("nan")
+    mean = np.mean(data)
+    std = np.std(data, ddof=0)
+    if std == 0:
+        return float("nan")
+    m4 = np.mean((np.array(data) - mean) ** 4)
+    return float(m4 / std ** 4 - 3)

@@ -8,7 +8,7 @@ project_root = os.path.abspath(os.path.join(current_dir, "../../"))
 ops_path = os.path.join(project_root, "utils", "math_utils", "complex_math_operations")
 
 if ops_path not in sys.path:
-    sys.path.append(ops_path)
+    sys.path.insert(0, ops_path)
 
 from complex import (
     complex_num, from_polar, to_polar, modulus, argument, argument_degrees,
@@ -64,6 +64,21 @@ from matrix import (
     kronecker_product, kronecker_sum,
     matrix_power_series, matrix_exp, matrix_log, matrix_sqrt, matrix_sin, matrix_cos,
     adjugate, characteristic_poly, pascal, frobenius_inner
+)
+from geometry import (
+    is_prime, fibonacci, sinc, hypot
+)
+from statistics import (
+    kurtosis
+)
+from basic_functions import (
+    count, count_if, count_ifs, sum, max as bf_max, min as bf_min,
+    product as bf_product, cumproduct, argmax, argmin, count_unique,
+    first, last, contains, index_of, count_of,
+    pairwise_diff, min_max_scale, delta,
+    running_min, running_max,
+    range_, linspace, logspace, fill, tabulate, iterate,
+    shuffle, sample, interleave
 )
 from bools import (
     true, false,
@@ -793,3 +808,122 @@ class TestBoolExtended2:
     def test_all_different(self):
         assert all_different(1, 2, 3)
         assert not all_different(1, 2, 1)
+
+
+class TestGeometry:
+    def test_is_prime(self):
+        assert is_prime(2)
+        assert is_prime(17)
+        assert not is_prime(1)
+        assert not is_prime(4)
+
+    def test_fibonacci(self):
+        assert fibonacci(0) == 0
+        assert fibonacci(1) == 1
+        assert fibonacci(10) == 55
+
+    def test_sinc_zero(self):
+        assert sinc(0) == 1.0
+
+    def test_sinc(self):
+        assert abs(sinc(0.5) - 2 / math.pi) < 1e-10
+
+    def test_hypot(self):
+        assert abs(hypot(3, 4) - 5) < 1e-10
+
+
+class TestStatistics:
+    def test_kurtosis_normal(self):
+        import numpy as np
+        data = list(np.random.default_rng(42).normal(0, 1, 10000))
+        k = kurtosis(data)
+        assert abs(k) < 0.5
+
+
+class TestBasicFunctions:
+    def test_product(self):
+        assert bf_product([1, 2, 3, 4]) == 24
+
+    def test_cumproduct(self):
+        assert cumproduct([1, 2, 3, 4]) == [1, 2, 6, 24]
+
+    def test_argmax(self):
+        assert argmax([3, 1, 4, 1, 5]) == 4
+
+    def test_argmin(self):
+        assert argmin([3, 1, 4, 1, 5]) == 1
+
+    def test_count_unique(self):
+        assert count_unique([1, 2, 2, 3, 3, 3]) == 3
+
+    def test_first_last(self):
+        assert first([10, 20, 30]) == 10
+        assert last([10, 20, 30]) == 30
+
+    def test_first_empty_raises(self):
+        with pytest.raises(ValueError):
+            first([])
+
+    def test_contains(self):
+        assert contains([1, 2, 3], 2)
+        assert not contains([1, 2, 3], 4)
+
+    def test_index_of(self):
+        assert index_of([1, 2, 3], 2) == 1
+        assert index_of([1, 2, 3], 4) == -1
+
+    def test_count_of(self):
+        assert count_of([1, 2, 2, 3], 2) == 2
+
+    def test_pairwise_diff(self):
+        assert pairwise_diff([1, 3, 6, 10]) == [2, 3, 4]
+
+    def test_min_max_scale(self):
+        s = min_max_scale([1, 3, 5])
+        assert s == [0.0, 0.5, 1.0]
+
+    def test_delta(self):
+        assert delta([1, 3, 6, 10]) == [2, 3, 4]
+
+    def test_running_min(self):
+        assert running_min([3, 1, 4, 1, 5]) == [3, 1, 1, 1, 1]
+
+    def test_running_max(self):
+        assert running_max([3, 1, 4, 1, 5]) == [3, 3, 4, 4, 5]
+
+    def test_range_(self):
+        r = range_(0, 5, 2)
+        assert r == [0, 2, 4]
+
+    def test_linspace(self):
+        l = linspace(0, 1, 5)
+        assert len(l) == 5
+        assert abs(l[0]) < 1e-10
+        assert abs(l[-1] - 1) < 1e-10
+
+    def test_logspace(self):
+        l = logspace(0, 2, 3)
+        assert len(l) == 3
+        assert abs(l[0] - 1) < 1e-10
+        assert abs(l[-1] - 100) < 1e-10
+
+    def test_fill(self):
+        assert fill(7, 4) == [7, 7, 7, 7]
+
+    def test_tabulate(self):
+        assert tabulate(lambda x: x * x, 5) == [0, 1, 4, 9, 16]
+
+    def test_iterate(self):
+        assert iterate(lambda x: x * 2, 1, 5) == [1, 2, 4, 8, 16]
+
+    def test_shuffle(self):
+        s = shuffle([1, 2, 3, 4], seed=42)
+        assert sorted(s) == [1, 2, 3, 4]
+
+    def test_sample(self):
+        s = sample([1, 2, 3, 4, 5], 3, seed=42)
+        assert len(s) == 3
+        assert all(x in [1, 2, 3, 4, 5] for x in s)
+
+    def test_interleave(self):
+        assert interleave([1, 2], [3, 4]) == [1, 3, 2, 4]

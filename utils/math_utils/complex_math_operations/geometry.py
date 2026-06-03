@@ -1242,3 +1242,69 @@ def randbetween(bottom: int, top: int) -> int:
     if bottom > top:
         raise ValueError("bottom must be less than or equal to top.")
     return int(np.random.randint(bottom, top + 1))
+
+
+def is_prime(n: int) -> bool:
+    """Check if a positive integer n is prime.
+
+    Args:
+        n: Integer to test.
+
+    Returns:
+        True if n is prime, False otherwise.
+    """
+    if n < 2:
+        return False
+    if n < 4:
+        return True
+    if n % 2 == 0 or n % 3 == 0:
+        return False
+    i = 5
+    while i * i <= n:
+        if n % i == 0 or n % (i + 2) == 0:
+            return False
+        i += 6
+    return True
+
+
+def fibonacci(n: int) -> int:
+    """Return the n-th Fibonacci number (F_0 = 0, F_1 = 1).
+
+    Args:
+        n: Non-negative integer index.
+
+    Returns:
+        The n-th Fibonacci number.
+    """
+    if n < 0:
+        raise ValueError("n must be non-negative.")
+    a, b = 0, 1
+    for _ in range(n):
+        a, b = b, a + b
+    return a
+
+
+def sinc(x: float) -> float:
+    """Compute the normalized sinc function sin(pi*x)/(pi*x).
+
+    Args:
+        x: Input value.
+
+    Returns:
+        sinc(x), with sinc(0) = 1.
+    """
+    if abs(x) < 1e-15:
+        return 1.0
+    return math.sin(math.pi * x) / (math.pi * x)
+
+
+def hypot(x: float, y: float) -> float:
+    """Compute sqrt(x**2 + y**2) avoiding overflow.
+
+    Args:
+        x, y: Numeric values.
+
+    Returns:
+        sqrt(x**2 + y**2).
+    """
+    return math.sqrt(x * x + y * y)
