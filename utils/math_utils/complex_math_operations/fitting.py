@@ -1,5 +1,14 @@
+import sympy as sp
 import numpy as np
-from scipy import stats
+from scipy import stats, optimize
+from scipy.optimize import OptimizeWarning
+import warnings
+
+import sys, os
+_parent = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _parent not in sys.path:
+    sys.path.insert(0, _parent)
+from sympy_latex_parser import parse_latex
 
 
 def _check_min_points(x, y, n=2):
@@ -170,6 +179,56 @@ def fit_logarithmic_coeffs(x: list, y: list) -> list:
 def fit_logarithmic_r2(x: list, y: list) -> float:
     a, b, r2 = fit_logarithmic(x, y)
     return float(r2)
+
+
+"""── Custom function fit ───────────────────────────────────────────────────────"""
+
+
+def fit_custom(func_str: str, x: list, y: list, var: str = "x", p0: list | None = None) -> list:
+    xa, ya = _to_float_arrays(x, y)
+    _check_min_points(x, y, 2)
+    expr = parse_latex(func_str)
+    sym_var = sp.Symbol(var)
+    if sym_var not in expr.free_symbols:
+        raise ValueError(f"Variable '{var}' not found in expression '{func_str}'")
+    params = sorted(expr.free_symbols - {sym_var}, key=str)
+    if not params:
+        raise ValueError("Expression has no free parameters to fit")
+    f = sp.lambdify((sym_var, *params), expr, "numpy")
+    guessed = _curve_fit(f, xa, ya, p0, len(params))
+    coeffs, cov = guessed
+    y_pred = f(xa, *coeffs)
+    r2 = _r2_score(ya, y_pred)
+    return [{str(s): float(c)} for s, c in zip(params, coeffs)], float(r2), y_pred.tolist()
+
+
+def fit_custom_coeffs(func_str: str, x: list, y: list, var: str = "x", p0: list | None = None) -> list:
+    result, _, _ = fit_custom(func_str, x, y, var, p0)
+    return result
+
+
+def fit_custom_r2(func_str: str, x: list, y: list, var: str = "x", p0: list | None = None) -> float:
+    _, r2, _ = fit_custom(func_str, x, y, var, p0)
+    return float(r2)
+
+
+def fit_custom_pred(func_str: str, x: list, y: list, var: str = "x", p0: list | None = None) -> list:
+    _, _, y_pred = fit_custom(func_str, x, y, var, p0)
+    return y_pred
+
+
+def _curve_fit(f, xa, ya, p0, n_params):
+    if p0 is None:
+        p0 = np.ones(n_params)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", OptimizeWarning)
+        return optimize.curve_fit(f, xa, ya, p0=p0, maxfev=10000)
+
+
+def _r2_score(ya, y_pred):
+    ss_res = np.sum((ya - y_pred) ** 2)
+    ss_tot = np.sum((ya - np.mean(ya)) ** 2)
+    return float(1 - ss_res / ss_tot) if ss_tot != 0 else 0.0
 
 
 """── Goodness of fit ───────────────────────────────────────────────────────────"""

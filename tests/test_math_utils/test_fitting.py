@@ -18,6 +18,7 @@ from fitting import (
     fit_power_coeffs, fit_power_r2,
     fit_logarithmic_coeffs, fit_logarithmic_r2,
     r_squared, rmse, mae,
+    fit_custom, fit_custom_coeffs, fit_custom_r2, fit_custom_pred,
 )
 
 
@@ -191,3 +192,58 @@ class TestGoodnessOfFit:
     def test_mae_mismatched_lengths_raises(self):
         with pytest.raises(ValueError):
             mae([1, 2], [1, 2, 3])
+
+
+class TestCustomFit:
+    def test_fit_custom_linear(self):
+        x = [0, 1, 2, 3, 4]
+        y = [1, 3, 5, 7, 9]
+        coeffs, r2, y_pred = fit_custom(r"a + b*x", x, y)
+        assert coeffs[0]["a"] == pytest.approx(1.0, abs=0.1)
+        assert coeffs[1]["b"] == pytest.approx(2.0, abs=0.1)
+        assert r2 == pytest.approx(1.0, abs=0.01)
+
+    def test_fit_custom_quadratic(self):
+        x = [0, 1, 2, 3, 4]
+        y = [0, 1, 4, 9, 16]
+        coeffs, r2, y_pred = fit_custom(r"a + b*x + c*x^2", x, y)
+        assert coeffs[2]["c"] == pytest.approx(1.0, abs=0.1)
+        assert coeffs[0]["a"] == pytest.approx(0.0, abs=0.1)
+        assert r2 == pytest.approx(1.0, abs=0.01)
+
+    def test_fit_custom_power_law(self):
+        x = [1, 2, 3, 4, 5]
+        y = [2 * xi**3 for xi in x]
+        coeffs, r2, y_pred = fit_custom(r"a * x^b", x, y, var="x")
+        assert coeffs[0]["a"] == pytest.approx(2.0, rel=0.1)
+        assert coeffs[1]["b"] == pytest.approx(3.0, rel=0.1)
+        assert r2 == pytest.approx(1.0, abs=0.01)
+
+    def test_fit_custom_with_p0(self):
+        x = [0, 1, 2, 3]
+        y = [5, 8, 11, 14]
+        coeffs = fit_custom_coeffs(r"a + b*x", x, y, p0=[1, 1])
+        assert coeffs[0]["a"] == pytest.approx(5.0, abs=0.5)
+        assert coeffs[1]["b"] == pytest.approx(3.0, abs=0.5)
+
+    def test_fit_custom_r2(self):
+        x = [0, 1, 2, 3]
+        y = [10, 20, 30, 40]
+        r2 = fit_custom_r2(r"a + b*x", x, y)
+        assert r2 == pytest.approx(1.0, abs=0.01)
+
+    def test_fit_custom_pred(self):
+        x = [0, 1, 2, 3]
+        y = [1, 3, 5, 7]
+        y_pred = fit_custom_pred(r"a + b*x", x, y)
+        assert y_pred == pytest.approx([1.0, 3.0, 5.0, 7.0], abs=0.5)
+
+    def test_fit_custom_no_params_raises(self):
+        with pytest.raises(ValueError, match="no free parameters"):
+            fit_custom(r"2*x", [1, 2, 3], [2, 4, 6])
+
+    def test_fit_custom_wrong_var_raises(self):
+        x = [0, 1, 2, 3]
+        y = [0, 1, 4, 9]
+        with pytest.raises((ValueError, TypeError)):
+            fit_custom(r"a + b*t", x, y, var="x")
