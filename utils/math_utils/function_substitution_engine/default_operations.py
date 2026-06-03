@@ -44,6 +44,8 @@ def _load_math_module(module_name: str, filename: str):
 
 GEOMETRY = _load_math_module("complex_geometry", "geometry.py")
 ENGINEERING = _load_math_module("complex_engineering", "engineering.py")
+FUNCTIONS = _load_math_module("complex_functions", "functions.py")
+FITTING = _load_math_module("complex_fitting", "fitting.py")
 
 
 def _spec(
@@ -607,5 +609,155 @@ DEFAULT_OPERATIONS = {
         output_type=VARIABLE_TYPE_CONSTANT_NO_ERROR,
         preserves_units=False,
         unit_rule=_unit_rule_same_unit,
+    ),
+
+    # ── Interpolation ─────────────────────────────────────────────────────
+    "interpolate_linear": _spec(
+        "interpolate_linear",
+        FUNCTIONS.interpolate_linear,
+        arity=3,
+        input_types={"column", "vector"},
+        output_type=VARIABLE_TYPE_CONSTANT_NO_ERROR,
+        preserves_units=False,
+    ),
+    "interpolate_cubic_spline": _spec(
+        "interpolate_cubic_spline",
+        FUNCTIONS.interpolate_cubic_spline,
+        arity=3,
+        input_types={"column", "vector"},
+        output_type=VARIABLE_TYPE_CONSTANT_NO_ERROR,
+        preserves_units=False,
+    ),
+    "interpolate_nearest": _spec(
+        "interpolate_nearest",
+        FUNCTIONS.interpolate_nearest,
+        arity=3,
+        input_types={"column", "vector"},
+        output_type=VARIABLE_TYPE_CONSTANT_NO_ERROR,
+        preserves_units=False,
+    ),
+    "interpolate_pchip": _spec(
+        "interpolate_pchip",
+        FUNCTIONS.interpolate_pchip,
+        arity=3,
+        input_types={"column", "vector"},
+        output_type=VARIABLE_TYPE_CONSTANT_NO_ERROR,
+        preserves_units=False,
+    ),
+    "interpolate_akima": _spec(
+        "interpolate_akima",
+        FUNCTIONS.interpolate_akima,
+        arity=3,
+        input_types={"column", "vector"},
+        output_type=VARIABLE_TYPE_CONSTANT_NO_ERROR,
+        preserves_units=False,
+    ),
+
+    # ── Linear regression ─────────────────────────────────────────────────
+    "linest_slope": _spec(
+        "linest_slope",
+        FITTING.linest_slope,
+        arity=2,
+        input_types={"column", "vector"},
+        output_type=VARIABLE_TYPE_CONSTANT_NO_ERROR,
+        preserves_units=False,
+    ),
+    "linest_intercept": _spec(
+        "linest_intercept",
+        FITTING.linest_intercept,
+        arity=2,
+        input_types={"column", "vector"},
+        output_type=VARIABLE_TYPE_CONSTANT_NO_ERROR,
+        preserves_units=False,
+    ),
+    "linest_r2": _spec(
+        "linest_r2",
+        FITTING.linest_r2,
+        arity=2,
+        input_types={"column", "vector"},
+        output_type=VARIABLE_TYPE_CONSTANT_NO_ERROR,
+        preserves_units=False,
+    ),
+
+    # ── Polynomial regression ─────────────────────────────────────────────
+    "polyfit_coeffs": _spec(
+        "polyfit_coeffs",
+        FITTING.polyfit_coeffs,
+        arity=2,
+        min_arity=2,
+        max_arity=3,
+        input_types={"column", "vector"},
+        output_type=VARIABLE_TYPE_CONSTANT_NO_ERROR,
+        preserves_units=False,
+    ),
+    "polyfit_r2": _spec(
+        "polyfit_r2",
+        FITTING.polyfit_r2,
+        arity=2,
+        min_arity=2,
+        max_arity=3,
+        input_types={"column", "vector"},
+        output_type=VARIABLE_TYPE_CONSTANT_NO_ERROR,
+        preserves_units=False,
+    ),
+    "polyval": _spec(
+        "polyval",
+        FITTING.polyval,
+        arity=2,
+        input_types={"column", "vector"},
+        output_type=VARIABLE_TYPE_CONSTANT_NO_ERROR,
+        preserves_units=False,
+    ),
+
+    # ── Exponential / power / logarithmic fits ────────────────────────────
+    "fit_exponential_coeffs": _spec(
+        "fit_exponential_coeffs",
+        FITTING.fit_exponential_coeffs,
+        arity=2,
+        input_types={"column", "vector"},
+        output_type=VARIABLE_TYPE_CONSTANT_NO_ERROR,
+        preserves_units=False,
+    ),
+    "fit_power_coeffs": _spec(
+        "fit_power_coeffs",
+        FITTING.fit_power_coeffs,
+        arity=2,
+        input_types={"column", "vector"},
+        output_type=VARIABLE_TYPE_CONSTANT_NO_ERROR,
+        preserves_units=False,
+    ),
+    "fit_logarithmic_coeffs": _spec(
+        "fit_logarithmic_coeffs",
+        FITTING.fit_logarithmic_coeffs,
+        arity=2,
+        input_types={"column", "vector"},
+        output_type=VARIABLE_TYPE_CONSTANT_NO_ERROR,
+        preserves_units=False,
+    ),
+
+    # ── Goodness of fit ───────────────────────────────────────────────────
+    "r_squared": _spec(
+        "r_squared",
+        FITTING.r_squared,
+        arity=2,
+        input_types={"column", "vector"},
+        output_type=VARIABLE_TYPE_CONSTANT_NO_ERROR,
+        preserves_units=False,
+    ),
+    "rmse": _spec(
+        "rmse",
+        FITTING.rmse,
+        arity=2,
+        input_types={"column", "vector"},
+        output_type=VARIABLE_TYPE_CONSTANT_NO_ERROR,
+        preserves_units=False,
+    ),
+    "mae": _spec(
+        "mae",
+        FITTING.mae,
+        arity=2,
+        input_types={"column", "vector"},
+        output_type=VARIABLE_TYPE_CONSTANT_NO_ERROR,
+        preserves_units=False,
     ),
 }
