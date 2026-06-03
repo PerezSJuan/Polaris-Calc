@@ -6,7 +6,7 @@ from datetime import date
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.abspath(os.path.join(current_dir, "../../"))
-ops_path = os.path.join(project_root, "utils", "math_utils", "complex_math_operations")
+ops_path = os.path.join(project_root, "utils", "math_utils", "calculus_engine")
 
 if ops_path not in sys.path:
     sys.path.insert(0, ops_path)

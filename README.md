@@ -100,7 +100,7 @@ Polaris-Calc/
 │       ├── uncertain_calculator.py # Propagación de incertidumbre de acuerdo con el GUM
 │       ├── unit_conversor/         # Conversor de unidades de física y dimensiones SI
 │       ├── plotter/                # Wrapper configurable sobre Matplotlib
-│       └── complex_math_operations/# Módulos avanzados para matemáticas complejas
+│       └── calculus_engine/          # Módulos avanzados para matemáticas complejas
 └── tests/            # Suite de pruebas unitarias para el motor matemático
 ```
 

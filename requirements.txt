@@ -1,6 +1,7 @@
 numpy
 numpy-financial
 sympy
+scipy
 matplotlib
 flet
 flet-base
