@@ -4,7 +4,90 @@ import random as _random
 import builtins
 
 
+"""── Aggregations ──────────────────────────────────────────────────────────────"""
+
+
+def sum(elements: list) -> float:
+    """Sum all elements in a list. Args: elements."""
+    return float(np.sum(elements))
+
+
+def max(elements: list) -> float:
+    """Return the maximum value in a list. Args: elements."""
+    return float(np.max(elements))
+
+
+def min(elements: list) -> float:
+    """Return the minimum value in a list. Args: elements."""
+    return float(np.min(elements))
+
+
+def product(elements: list) -> float:
+    """Multiply all elements in a list. Args: elements."""
+    return float(np.prod(elements))
+
+
+def sumsq(elements: list) -> float:
+    """Sum of squares of all elements. Args: elements."""
+    return float(np.sum(np.array(elements) ** 2))
+
+
+def sum_cubes(elements: list) -> float:
+    """Sum of cubes of all elements. Args: elements."""
+    return float(np.sum(np.array(elements) ** 3))
+
+
+def sum_abs(elements: list) -> float:
+    """Sum of absolute values of all elements. Args: elements."""
+    return float(np.sum(np.abs(elements)))
+
+
+def product_abs(elements: list) -> float:
+    """Product of absolute values of all elements. Args: elements."""
+    return float(np.prod(np.abs(elements)))
+
+
+def product_sq(elements: list) -> float:
+    """Product of squares of all elements. Args: elements."""
+    return float(np.prod(np.array(elements) ** 2))
+
+
+def norm1(elements: list) -> float:
+    """L1 norm (sum of absolute values). Args: elements."""
+    return sum_abs(elements)
+
+
+def norm2(elements: list) -> float:
+    """L2 norm (sqrt of sum of squares). Args: elements."""
+    return float(math.sqrt(sumsq(elements)))
+
+
+def range_of(elements: list) -> float:
+    """Range (max - min) of elements. Args: elements."""
+    return builtins.max(elements) - builtins.min(elements)
+
+
+def midrange(elements: list) -> float:
+    """Midrange ((max + min) / 2) of elements. Args: elements."""
+    return (builtins.max(elements) + builtins.min(elements)) / 2
+
+
 """── Position & selection ──────────────────────────────────────────────────────"""
+
+
+def count(elements: list) -> int:
+    """Return the number of elements in a list. Args: elements."""
+    return len(elements)
+
+
+def count_if(elements: list, condition: callable) -> int:
+    """Count elements that satisfy a condition. Args: elements, condition."""
+    return len([element for element in elements if condition(element)])
+
+
+def count_ifs(elements: list, conditions: list) -> int:
+    """Count elements that satisfy all conditions. Args: elements, conditions."""
+    return len([element for element in elements if all(condition(element) for condition in conditions)])
 
 
 def argmax(elements: list) -> int:

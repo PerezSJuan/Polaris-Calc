@@ -71,11 +71,11 @@ from geometry import (
 from statistics import (
     kurtosis
 )
-from basic_functions import (
-    count, count_if, count_ifs, sum, max as bf_max, min as bf_min,
-    product as bf_product
-)
 from lists import (
+    count, count_if, count_ifs,
+    sum, max as bf_max, min as bf_min, product as bf_product,
+    sumsq, sum_cubes, sum_abs, product_abs, product_sq,
+    norm1, norm2, range_of, midrange,
     argmax, argmin, first, last, contains, index_of, count_of,
     count_unique, cumproduct, pairwise_diff, delta,
     min_max_scale, running_min, running_max,
@@ -842,9 +842,45 @@ class TestStatistics:
         assert abs(k) < 0.5
 
 
-class TestBasicFunctions:
+class TestLists:
+    def test_sum(self):
+        assert abs(sum([1, 2, 3]) - 6) < 1e-10
+
+    def test_max(self):
+        assert bf_max([3, 1, 4, 1, 5]) == 5
+
+    def test_min(self):
+        assert bf_min([3, 1, 4, 1, 5]) == 1
+
     def test_product(self):
         assert bf_product([1, 2, 3, 4]) == 24
+
+    def test_sumsq(self):
+        assert sumsq([1, 2, 3]) == 14
+
+    def test_sum_cubes(self):
+        assert sum_cubes([1, 2, 3]) == 36
+
+    def test_sum_abs(self):
+        assert sum_abs([-1, 2, -3]) == 6
+
+    def test_product_abs(self):
+        assert product_abs([-1, 2, -3]) == 6
+
+    def test_product_sq(self):
+        assert product_sq([1, 2, 3]) == 36
+
+    def test_norm1(self):
+        assert norm1([-1, 2, -3]) == 6
+
+    def test_norm2(self):
+        assert abs(norm2([3, 4]) - 5) < 1e-10
+
+    def test_range_of(self):
+        assert range_of([3, 1, 4, 1, 5]) == 4
+
+    def test_midrange(self):
+        assert midrange([3, 1, 4, 1, 5]) == 3
 
     def test_cumproduct(self):
         assert cumproduct([1, 2, 3, 4]) == [1, 2, 6, 24]
