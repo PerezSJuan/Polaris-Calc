@@ -73,10 +73,12 @@ from statistics import (
 )
 from basic_functions import (
     count, count_if, count_ifs, sum, max as bf_max, min as bf_min,
-    product as bf_product, cumproduct, argmax, argmin, count_unique,
-    first, last, contains, index_of, count_of,
-    pairwise_diff, min_max_scale, delta,
-    running_min, running_max,
+    product as bf_product
+)
+from lists import (
+    argmax, argmin, first, last, contains, index_of, count_of,
+    count_unique, cumproduct, pairwise_diff, delta,
+    min_max_scale, running_min, running_max,
     range_, linspace, logspace, fill, tabulate, iterate,
     shuffle, sample, interleave
 )
