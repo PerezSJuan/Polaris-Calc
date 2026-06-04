@@ -260,10 +260,10 @@ async def EditorScreen(data: fr.DataSystem, themes):
                     dep_value = dep_values[0]
                 else:
                     dep_value = dep_values[idx]
-                variables[dep] = (
-                    _as_float(dep_value),
-                    _normalize_unit_for_eval(dep_entry.get("unit", "none")),
-                )
+                variables[dep] = {
+                    "value": dep_value,
+                    "unit": _normalize_unit_for_eval(dep_entry.get("unit", "none")),
+                }
 
             value, unit = evaluate(formula, variables, mode="auto")
             if variable_type == VARIABLE_TYPE_BOOLEAN_FORMULA:
