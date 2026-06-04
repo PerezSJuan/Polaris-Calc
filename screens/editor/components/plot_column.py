@@ -37,6 +37,7 @@ from plotter.plotter import (
 from plotter.residuals_helper import linear_regression, polynomial_regression
 
 from utils.variable_types import VARIABLE_TYPE_PLOT
+from function_substitution_engine import resolve_pool_variable, UndefinedSymbolError
 
 _CARD_W = 340
 _CARD_RADIUS = 12
@@ -108,6 +109,12 @@ def _build_figure(pool: dict, plot_name: str) -> plt.Figure | None:
         y_vars = [s.get("y_var", "") for s in series_list if s.get("y_var") and s.get("plot_type") not in _NEEDS_SINGLE_H]
         ylabel = y_vars[0] if y_vars else "y"
 
+    def _resolve(name: str, pool: dict):
+        try:
+            return resolve_pool_variable(name, pool)
+        except UndefinedSymbolError:
+            return None
+
     plot_series: list[SeriesConfig] = []
 
     for sc in series_list:
@@ -117,8 +124,10 @@ def _build_figure(pool: dict, plot_name: str) -> plt.Figure | None:
         x_err_v = sc.get("x_err_var", "")
         y_err_v = sc.get("y_err_var", "")
 
-        x_vals = pool.get(x_var, {}).get("values", []) if x_var else []
-        y_vals = pool.get(y_var, {}).get("values", []) if y_var else []
+        x_pv = _resolve(x_var, pool) if x_var else None
+        y_pv = _resolve(y_var, pool) if y_var else None
+        x_vals = x_pv.value if x_pv else []
+        y_vals = y_pv.value if y_pv else []
 
         if not x_vals:
             continue
@@ -129,10 +138,24 @@ def _build_figure(pool: dict, plot_name: str) -> plt.Figure | None:
         xerr = None
         yerr = None
         if pt == "errorbar":
-            if x_err_v and pool.get(x_err_v, {}).get("values"):
-                xerr = np.asarray(pool[x_err_v]["values"], dtype=float)
-            if y_err_v and pool.get(y_err_v, {}).get("values"):
-                yerr = np.asarray(pool[y_err_v]["values"], dtype=float)
+            x_err_pv = _resolve(x_err_v, pool) if x_err_v else None
+            y_err_pv = _resolve(y_err_v, pool) if y_err_v else None
+            if x_err_pv and x_err_pv.value:
+                xerr = np.asarray(x_err_pv.value, dtype=float)
+            if y_err_pv and y_err_pv.value:
+                yerr = np.asarray(y_err_pv.value, dtype=float)
+
+            # Auto-detectar errors del pool si no se especificaron explícitamente
+            if y_err_pv is None and y_var and y_pv:
+                y_entry = pool.get(y_var, {})
+                y_errors = y_entry.get("errors", [])
+                if y_errors:
+                    yerr = np.asarray(y_errors if isinstance(y_errors, list) else [y_errors], dtype=float)
+            if x_err_pv is None and x_var and x_pv:
+                x_entry = pool.get(x_var, {})
+                x_errors = x_entry.get("errors", [])
+                if x_errors:
+                    xerr = np.asarray(x_errors if isinstance(x_errors, list) else [x_errors], dtype=float)
 
         s_kwargs: dict = dict(
             plot_type=pt,
@@ -163,14 +186,16 @@ def _build_figure(pool: dict, plot_name: str) -> plt.Figure | None:
 
     # regresión (usar la primera serie con y para calcular)
     first_y_series = next(
-        (s for s in series_list if s.get("y_var") and pool.get(s["y_var"], {}).get("values")),
+        (s for s in series_list if s.get("y_var") and _resolve(s["y_var"], pool) is not None),
         None,
     )
     if reg != "none" and first_y_series:
         y_var_reg = first_y_series["y_var"]
         x_var_reg = first_y_series.get("x_var", "")
-        x_vals_reg = pool.get(x_var_reg, {}).get("values", [])
-        y_vals_reg = pool.get(y_var_reg, {}).get("values", [])
+        x_reg_pv = _resolve(x_var_reg, pool)
+        y_reg_pv = _resolve(y_var_reg, pool)
+        x_vals_reg = x_reg_pv.value if x_reg_pv else []
+        y_vals_reg = y_reg_pv.value if y_reg_pv else []
         if x_vals_reg and y_vals_reg and len(x_vals_reg) > 1:
             try:
                 x_r = np.asarray(x_vals_reg, dtype=float)

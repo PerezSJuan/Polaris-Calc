@@ -17,7 +17,7 @@ math_utils_path = os.path.abspath(
 if math_utils_path not in sys.path:
     sys.path.append(math_utils_path)
 
-from function_substitution_engine import CONSTANTS, evaluate, parse_expression
+from function_substitution_engine import CONSTANTS, evaluate, parse_expression, resolve_pool_variable
 
 from screens.editor.utils.utils import normalize_editor_data
 from screens.editor.components.column import EditableColumn
@@ -229,8 +229,9 @@ async def EditorScreen(data: fr.DataSystem, themes):
             )
         dep_lengths = {}
         for dep in deps:
-            dep_values = pool.get(dep, {}).get("values", [])
-            dep_lengths[dep] = len(dep_values) if isinstance(dep_values, list) else 0
+            dep_pv = resolve_pool_variable(dep, pool)
+            vals = dep_pv.value
+            dep_lengths[dep] = len(vals) if isinstance(vals, list) else 0
 
         non_scalar_lengths = {length for length in dep_lengths.values() if length != 1}
         if len(non_scalar_lengths) > 1:
@@ -254,15 +255,10 @@ async def EditorScreen(data: fr.DataSystem, themes):
         for idx in range(target_len):
             variables = {}
             for dep in deps:
-                dep_entry = pool.get(dep, {})
-                dep_values = dep_entry.get("values", [])
-                if len(dep_values) == 1:
-                    dep_value = dep_values[0]
-                else:
-                    dep_value = dep_values[idx]
+                dep_pv = resolve_pool_variable(dep, pool, row_index=idx)
                 variables[dep] = {
-                    "value": dep_value,
-                    "unit": _normalize_unit_for_eval(dep_entry.get("unit", "none")),
+                    "value": dep_pv.value,
+                    "unit": _normalize_unit_for_eval(dep_pv.unit),
                 }
 
             value, unit = evaluate(formula, variables, mode="auto")

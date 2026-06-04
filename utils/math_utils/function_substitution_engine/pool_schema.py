@@ -34,6 +34,40 @@ COLUMN_TYPES = {
     VARIABLE_TYPE_COLUMN_WITH_ERROR_PER_VALUE,
 }
 
+# SI dimension vector: (L, M, T, I, Theta, N, J)
+MAGNITUDE_TO_DIM: dict[str, tuple[int, ...]] = {
+    "Dimensionless":  (0, 0, 0, 0, 0, 0, 0),
+    "Length":         (1, 0, 0, 0, 0, 0, 0),
+    "Mass":           (0, 1, 0, 0, 0, 0, 0),
+    "Time":           (0, 0, 1, 0, 0, 0, 0),
+    "Temperature":    (0, 0, 0, 0, 1, 0, 0),
+    "Current":        (0, 0, 0, 1, 0, 0, 0),
+    "Chemical Amount":(0, 0, 0, 0, 0, 1, 0),
+    "Luminous Intensity": (0, 0, 0, 0, 0, 0, 1),
+    "Area":           (2, 0, 0, 0, 0, 0, 0),
+    "Volume":         (3, 0, 0, 0, 0, 0, 0),
+    "Speed":          (1, 0, -1, 0, 0, 0, 0),
+    "Acceleration":   (1, 0, -2, 0, 0, 0, 0),
+    "Force":          (1, 1, -2, 0, 0, 0, 0),
+    "Energy":         (2, 1, -2, 0, 0, 0, 0),
+    "Power":          (2, 1, -3, 0, 0, 0, 0),
+    "Pressure":       (-1, 1, -2, 0, 0, 0, 0),
+    "Frequency":      (0, 0, -1, 0, 0, 0, 0),
+    "Angle":          (0, 0, 0, 0, 0, 0, 0),
+    "Solid Angle":    (0, 0, 0, 0, 0, 0, 0),
+    "Radioactivity":  (0, 0, -1, 0, 0, 0, 0),
+    "Electric Charge":(0, 0, 1, 1, 0, 0, 0),
+    "Voltage":        (2, 1, -3, -1, 0, 0, 0),
+    "Resistance":     (2, 1, -3, -2, 0, 0, 0),
+    "Density":        (-3, 1, 0, 0, 0, 0, 0),
+    "Torque":         (2, 1, -2, 0, 0, 0, 0),
+    "Entropy":        (2, 1, -2, 0, -1, 0, 0),
+}
+
+
+def magnitude_to_dim(magnitude: str) -> tuple[int, ...] | None:
+    return MAGNITUDE_TO_DIM.get(magnitude)
+
 
 @dataclass
 class PoolValue:
@@ -42,6 +76,7 @@ class PoolValue:
     value: Any
     unit: str = "1"
     shape: tuple[int, ...] | None = None
+    si_dim: tuple[int, ...] | None = None
 
 def infer_shape(value: Any) -> tuple[int, ...] | None:
     if isinstance(value, list):
@@ -95,7 +130,8 @@ def normalize_variable_entry(name: str, entry: Any) -> PoolValue:
         var_type = entry.get("type") or infer_type_from_value(value)
         unit = entry.get("unit", "1") or "1"
         shape = tuple(entry["dimensions"]) if entry.get("dimensions") else infer_shape(value)
-        return PoolValue(name=name, type=var_type, value=value, unit=unit, shape=shape)
+        si_dim = entry.get("si_dim") or magnitude_to_dim(entry.get("magnitude", ""))
+        return PoolValue(name=name, type=var_type, value=value, unit=unit, shape=shape, si_dim=si_dim)
     raise TypeError(f"Unsupported variable entry for '{name}': {type(entry)}")
 
 
