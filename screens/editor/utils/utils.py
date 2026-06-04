@@ -100,17 +100,23 @@ def _normalize_columns(raw) -> list[dict]:
             description = col.get("description", "")
             formula = col.get("formula", "")
             var_type = infer_variable_type(col)
+            plot_config = col.get("plot_config", {})
+            dimensions = col.get("dimensions")
+            rows = col.get("rows")
+            cols = col.get("cols")
         elif isinstance(col, list):
-            name, values, normalized_errors, var_type, magnitude, unit, description, formula = (
-                f"V{i + 1}",
-                col,
-                [],
-                VARIABLE_TYPE_COLUMN_NO_ERROR,
-                "none",
-                "none",
-                "",
-                "",
-            )
+            name = f"V{i + 1}"
+            values = col
+            normalized_errors = []
+            var_type = VARIABLE_TYPE_COLUMN_NO_ERROR
+            magnitude = "none"
+            unit = "none"
+            description = ""
+            formula = ""
+            plot_config = {}
+            dimensions = None
+            rows = None
+            cols = None
         else:
             continue
         columns.append(
@@ -123,10 +129,10 @@ def _normalize_columns(raw) -> list[dict]:
                 "unit": unit,
                 "description": description,
                 "formula": formula,
-                "plot_config": col.get("plot_config", {}),
-                "dimensions": col.get("dimensions"),
-                "rows": col.get("rows"),
-                "cols": col.get("cols"),
+                "plot_config": plot_config,
+                "dimensions": dimensions,
+                "rows": rows,
+                "cols": cols,
             }
         )
 

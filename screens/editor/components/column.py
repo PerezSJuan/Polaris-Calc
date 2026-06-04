@@ -255,7 +255,7 @@ class LatexCell(ft.Stack):
         if self._on_focus_cb:
             # Simulate a focus event for the column to track it
             e.control = self.edit_field
-            if asyncio.iscoroutinefunction(self._on_focus_cb):
+            if inspect.iscoroutinefunction(self._on_focus_cb):
                 await self._on_focus_cb(e)
             else:
                 self._on_focus_cb(e)
@@ -270,7 +270,7 @@ class LatexCell(ft.Stack):
         await self._update_display()
         if self._on_blur_cb:
             e.control = self.edit_field
-            if asyncio.iscoroutinefunction(self._on_blur_cb):
+            if inspect.iscoroutinefunction(self._on_blur_cb):
                 await self._on_blur_cb(e)
             else:
                 self._on_blur_cb(e)
@@ -281,14 +281,14 @@ class LatexCell(ft.Stack):
         except:
             pass
         if self._on_change_cb:
-            if asyncio.iscoroutinefunction(self._on_change_cb):
+            if inspect.iscoroutinefunction(self._on_change_cb):
                 await self._on_change_cb(e)
             else:
                 self._on_change_cb(e)
 
     async def _on_delete_click(self, e):
         if self._on_delete_cb:
-            if asyncio.iscoroutinefunction(self._on_delete_cb):
+            if inspect.iscoroutinefunction(self._on_delete_cb):
                 await self._on_delete_cb(e)
             else:
                 self._on_delete_cb(e)
@@ -731,11 +731,11 @@ class EditableColumn(ft.Container):
             except Exception:
                 pass
         if not self._is_derived():
-            if asyncio.iscoroutinefunction(self.sync_pool):
+            if inspect.iscoroutinefunction(self.sync_pool):
                 await self.sync_pool()
             else:
                 self.sync_pool()
-            if asyncio.iscoroutinefunction(self._notify_change):
+            if inspect.iscoroutinefunction(self._notify_change):
                 await self._notify_change()
             else:
                 self._notify_change()
@@ -1098,7 +1098,7 @@ class EditableColumn(ft.Container):
     async def _on_manage_click(self, action, e):
         if not self._on_manage_cb:
             return
-        if asyncio.iscoroutinefunction(self._on_manage_cb):
+        if inspect.iscoroutinefunction(self._on_manage_cb):
             await self._on_manage_cb(self.current_name, action)
         else:
             self._on_manage_cb(self.current_name, action)
@@ -1109,7 +1109,7 @@ class EditableColumn(ft.Container):
             return
         import asyncio
 
-        if asyncio.iscoroutinefunction(open_variable_settings_modal):
+        if inspect.iscoroutinefunction(open_variable_settings_modal):
             asyncio.create_task(
                 open_variable_settings_modal(
                     page, self.current_name, self.pool, self._notify_change, self.themes

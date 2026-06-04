@@ -160,6 +160,7 @@ class SeriesConfig:
     heatmap_fmt: str = ".2f"
     heatmap_xticklabels: Sequence[str] | None = None
     heatmap_yticklabels: Sequence[str] | None = None
+    aspect: str | float = "auto"
 
     # --- Extras ---
     extra_kwargs: dict[str, Any] = field(default_factory=dict)
@@ -353,9 +354,14 @@ def _render_series(ax: plt.Axes, s: SeriesConfig, color: str | None = None) -> A
             if isinstance(y[0], (list, np.ndarray))
             else [y]
         )
-        kw.pop("labels", None)  # evitar duplicado si viene en extra_kwargs
-        box_lbls = s.box_labels or ([s.label] if s.label else None)
-        return ax.boxplot(data, notch=s.box_notch, vert=s.vert, labels=box_lbls, **kw)
+        box_lbls = s.box_labels
+        if box_lbls is None and s.label and len(data) == 1:
+            box_lbls = [s.label]
+        kwargs = dict(kw)
+        if box_lbls is not None:
+            kwargs["tick_labels"] = box_lbls
+        orientation = "vertical" if s.vert else "horizontal"
+        return ax.boxplot(data, notch=s.box_notch, orientation=orientation, **kwargs)
 
     elif s.plot_type == "violin":
         data = (
@@ -363,7 +369,8 @@ def _render_series(ax: plt.Axes, s: SeriesConfig, color: str | None = None) -> A
             if isinstance(y[0], (list, np.ndarray))
             else [y]
         )
-        return ax.violinplot(data, vert=s.vert, showmeans=s.violin_showmeans, **kw)
+        orientation = "vertical" if s.vert else "horizontal"
+        return ax.violinplot(data, orientation=orientation, showmeans=s.violin_showmeans, **kw)
 
     elif s.plot_type == "step":
         return ax.step(
