@@ -185,7 +185,8 @@ async def Home(data: fr.DataSystem):
 
 @app.page("/settings")
 async def Settings(data: fr.DataSystem):
-    pass
+    from screens.settings import SettingsScreen
+    return await SettingsScreen(data.page, themes)
 
 
 @app.page("/editor")

@@ -119,6 +119,23 @@ def _binary_elemwise(op: str, left: EvalResult, right: EvalResult, output_type: 
         matrix = right.value if left_kind == "scalar" else left.value
         return _result([[scalar * item for item in row] for row in matrix], unit, output_type, warnings, index_errors)
 
+    if op in {"+", "-", "/"} and (
+        (left_kind == "scalar" and right_kind == "matrix")
+        or (right_kind == "scalar" and left_kind == "matrix")
+    ):
+        scalar = left.value if left_kind == "scalar" else right.value
+        matrix = right.value if left_kind == "scalar" else left.value
+        scalar_first = left_kind == "scalar"
+        if op == "+":
+            return _result([[scalar + item for item in row] for row in matrix], unit, output_type, warnings, index_errors)
+        if op == "-":
+            if scalar_first:
+                return _result([[scalar - item for item in row] for row in matrix], unit, output_type, warnings, index_errors)
+            return _result([[item - scalar for item in row] for row in matrix], unit, output_type, warnings, index_errors)
+        if scalar_first:
+            return _result([[scalar / item for item in row] for row in matrix], unit, output_type, warnings, index_errors)
+        return _result([[item / scalar for item in row] for row in matrix], unit, output_type, warnings, index_errors)
+
     if op in {"+", "-"} and left_kind == right_kind == "matrix":
         if infer_shape(left.value) != infer_shape(right.value):
             raise ShapeMismatchError("Matrix shape mismatch", node_repr)

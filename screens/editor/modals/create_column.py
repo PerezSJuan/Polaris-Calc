@@ -477,16 +477,27 @@ async def open_create_column_modal(
             "formula": formula if is_derived else "",
         }
 
+        from screens.editor.components.formula_column import FormulaColumn
         from screens.editor.components.column import EditableColumn
 
-        new_col = EditableColumn(
-            pool=pool,
-            current_name=var_name,
-            on_change=on_column_data_changed,
-            available_vars_getter=get_available_vars,
-            themes=themes,
-            on_manage=on_manage,
-        )
+        if is_derived:
+            new_col = FormulaColumn(
+                pool=pool,
+                current_name=var_name,
+                on_change=on_column_data_changed,
+                available_vars_getter=get_available_vars,
+                themes=themes,
+                on_manage=on_manage,
+            )
+        else:
+            new_col = EditableColumn(
+                pool=pool,
+                current_name=var_name,
+                on_change=on_column_data_changed,
+                available_vars_getter=get_available_vars,
+                themes=themes,
+                on_manage=on_manage,
+            )
 
         controls = columns_row.controls
         if controls and getattr(controls[-1], "data", None) == "add_button":

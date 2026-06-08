@@ -6,6 +6,8 @@ Cubre únicamente los tipos de fórmula:
 La fórmula es obligatoria; las unidades se derivan automáticamente.
 """
 
+import sympy as sp
+from sympy.core.function import AppliedUndef
 import flet as ft
 from flet_base.translations import instance_translation_manager as tm
 from flet_base.components.inputs import dropdown, text_input
@@ -17,7 +19,6 @@ from utils.variable_types import (
     VARIABLE_TYPE_FORMULA_WITH_ERROR,
     VARIABLE_TYPE_BOOLEAN_FORMULA,
     VARIABLE_TYPE_LABELS,
-    is_boolean_type,
 )
 from screens.editor.modals.utils import (
     _c,
@@ -25,12 +26,62 @@ from screens.editor.modals.utils import (
     _card,
     _parse_name_unit,
 )
+from function_substitution_engine import CONSTANTS, parse_expression, DEFAULT_OPERATIONS
 
 _FORMULA_TYPES = [
     VARIABLE_TYPE_FORMULA_NO_ERROR,
     VARIABLE_TYPE_FORMULA_WITH_ERROR,
     VARIABLE_TYPE_BOOLEAN_FORMULA,
 ]
+
+
+def _check_formula(formula: str, pool_keys: set[str], user_ops: dict | None = None) -> list[str]:
+    """Validate a formula string, returning a list of error messages.
+    Checks for parse errors, undefined function calls, and undefined symbols.
+    """
+    if not formula.strip():
+        return []
+
+    errors: list[str] = []
+
+    # Build set of known operation names (including backslash variants)
+    ops_set: set[str] = set()
+    op_names_list: list[str] = []
+    for op_name, spec in DEFAULT_OPERATIONS.items():
+        ops_set.add(op_name)
+        ops_set.add(f"\\{op_name}")
+        op_names_list.append(op_name)
+        for alias in spec.aliases:
+            ops_set.add(alias)
+            ops_set.add(f"\\{alias}")
+            op_names_list.append(alias)
+    if user_ops:
+        for name in user_ops:
+            ops_set.add(name)
+            ops_set.add(f"\\{name}")
+            op_names_list.append(name)
+
+    try:
+        expr = parse_expression(formula, mode="auto", operation_names=op_names_list)
+    except Exception:
+        return ["No se pudo analizar la fórmula: revisa la sintaxis."]
+
+    # Check for undefined function calls (AppliedUndef = not a SymPy built-in)
+    for subexpr in sp.preorder_traversal(expr):
+        if isinstance(subexpr, AppliedUndef):
+            func_name = str(subexpr.func)
+            if func_name not in ops_set:
+                errors.append(f"Operación desconocida: '{func_name}'")
+
+    # Check for undefined variables
+    pool_set = set(pool_keys)
+    const_set = set(CONSTANTS.keys())
+    symbols = {str(sym) for sym in expr.free_symbols}
+    undefined = sorted(symbols - pool_set - const_set)
+    for sym in undefined:
+        errors.append(f"Símbolo no definido: '{sym}'")
+
+    return errors
 
 
 async def open_create_formula_modal(
@@ -43,6 +94,7 @@ async def open_create_formula_modal(
     update_shared_state,
     themes,
     on_manage=None,
+    user_ops=None,
 ):
     t = themes.actual_theme
     acc = t.get("formula_accent", t["primary"])
@@ -217,6 +269,11 @@ async def open_create_formula_modal(
             _show_error(tm.translate("Debes ingresar una fórmula."))
             return
 
+        formula_errors = _check_formula(formula, set(pool.keys()), user_ops)
+        if formula_errors:
+            _show_error("\n".join(formula_errors))
+            return
+
         pool[var_name] = {
             "values": [],
             "errors": [],
@@ -227,27 +284,16 @@ async def open_create_formula_modal(
             "formula": formula,
         }
 
-        from screens.editor.components.column import EditableColumn
-        from screens.editor.components.boolean_column import BooleanColumn
+        from screens.editor.components.formula_column import FormulaColumn
 
-        if is_boolean_type(var_type):
-            new_col = BooleanColumn(
-                pool=pool,
-                current_name=var_name,
-                on_change=on_column_data_changed,
-                available_vars_getter=get_available_vars,
-                themes=themes,
-                on_manage=on_manage,
-            )
-        else:
-            new_col = EditableColumn(
-                pool=pool,
-                current_name=var_name,
-                on_change=on_column_data_changed,
-                available_vars_getter=get_available_vars,
-                themes=themes,
-                on_manage=on_manage,
-            )
+        new_col = FormulaColumn(
+            pool=pool,
+            current_name=var_name,
+            on_change=on_column_data_changed,
+            available_vars_getter=get_available_vars,
+            themes=themes,
+            on_manage=on_manage,
+        )
 
         controls = columns_row.controls
         if controls and getattr(controls[-1], "data", None) == "add_button":

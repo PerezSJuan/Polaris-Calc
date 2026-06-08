@@ -3,6 +3,8 @@ import sys
 import uuid
 import asyncio
 from functools import partial
+import sympy as sp
+from sympy.core.function import AppliedUndef
 import flet as ft
 import flet_base.router as fr
 from flet_base.translations import instance_translation_manager as tm
@@ -17,7 +19,8 @@ math_utils_path = os.path.abspath(
 if math_utils_path not in sys.path:
     sys.path.append(math_utils_path)
 
-from function_substitution_engine import CONSTANTS, evaluate, parse_expression, resolve_pool_variable
+from function_substitution_engine import CONSTANTS, evaluate, parse_expression, resolve_pool_variable, DEFAULT_OPERATIONS
+from function_substitution_engine.ops_config import OperationNamingConfig, build_user_operations, _load_overrides
 
 from screens.editor.utils.utils import normalize_editor_data
 from screens.editor.components.column import EditableColumn
@@ -26,6 +29,7 @@ from screens.editor.components.boolean_column import BooleanColumn
 from screens.editor.components.matrix_column import MatrixColumn
 from screens.editor.components.complex_column import ComplexColumn
 from screens.editor.components.vector_column import VectorColumn
+from screens.editor.components.formula_column import FormulaColumn
 from utils.variable_types import (
     VARIABLE_TYPE_COLUMN_NO_ERROR,
     VARIABLE_TYPE_FORMULA_WITH_ERROR,
@@ -57,6 +61,19 @@ async def EditorScreen(data: fr.DataSystem, themes):
     """Main screen for managing and editing data vectors, with tab layout."""
 
     normalized = normalize_editor_data(data.shared.get("editor_data", []))
+
+    # Load user operation overrides from persistent storage
+    user_ops: dict | None = None
+    try:
+        _store = ft.SharedPreferences()
+        raw = await _store.get("polaris.ops_overrides")
+        if raw:
+            cfg = OperationNamingConfig()
+            cfg.load_from_storage(raw)
+            if not cfg.validate():
+                user_ops = build_user_operations(cfg)
+    except Exception:
+        pass
 
     def _normalize_errors(raw_errors):
         if isinstance(raw_errors, list):
@@ -145,14 +162,14 @@ async def EditorScreen(data: fr.DataSystem, themes):
         return [
             c
             for c in columns_row.controls
-            if isinstance(c, (EditableColumn, BooleanColumn, ComplexColumn, VectorColumn, MatrixColumn))
+            if isinstance(c, (EditableColumn, BooleanColumn, ComplexColumn, VectorColumn, MatrixColumn, FormulaColumn))
         ]
 
     def _visible_column_names() -> set[str]:
         """Returns names of all visible columns, including PlotColumns."""
         names = set()
         for c in columns_row.controls:
-            if isinstance(c, (EditableColumn, BooleanColumn, ComplexColumn, VectorColumn, MatrixColumn)):
+            if isinstance(c, (EditableColumn, BooleanColumn, ComplexColumn, VectorColumn, MatrixColumn, FormulaColumn)):
                 names.add(c.current_name)
             elif isinstance(c, PlotColumn):
                 names.add(c.plot_name)
@@ -161,7 +178,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
     def _all_named_columns() -> list[str]:
         result = []
         for c in columns_row.controls:
-            if isinstance(c, (EditableColumn, BooleanColumn, ComplexColumn, VectorColumn, MatrixColumn)):
+            if isinstance(c, (EditableColumn, BooleanColumn, ComplexColumn, VectorColumn, MatrixColumn, FormulaColumn)):
                 result.append(c.current_name)
             elif isinstance(c, PlotColumn):
                 result.append(c.plot_name)
@@ -208,7 +225,38 @@ async def EditorScreen(data: fr.DataSystem, themes):
             return 0.0
 
     def _extract_dependencies(variable_name: str, formula: str) -> list[str]:
-        expr = parse_expression(formula, mode="auto")
+        # Build known operation names for parser and function check
+        known_ops: set[str] = set()
+        op_names_list: list[str] = []
+        for op_name, spec in DEFAULT_OPERATIONS.items():
+            known_ops.add(op_name)
+            known_ops.add(f"\\{op_name}")
+            op_names_list.append(op_name)
+            for alias in spec.aliases:
+                known_ops.add(alias)
+                known_ops.add(f"\\{alias}")
+                op_names_list.append(alias)
+        if user_ops:
+            for name in user_ops:
+                known_ops.add(name)
+                known_ops.add(f"\\{name}")
+                op_names_list.append(name)
+
+        expr = parse_expression(formula, mode="auto", operation_names=op_names_list)
+
+        # Check for unknown function calls
+        unknown_funcs: list[str] = []
+        for subexpr in sp.preorder_traversal(expr):
+            if isinstance(subexpr, AppliedUndef):
+                func_name = str(subexpr.func)
+                if func_name not in known_ops:
+                    unknown_funcs.append(func_name)
+        if unknown_funcs:
+            raise ValueError(
+                f"{variable_name}: operaciones desconocidas ({', '.join(sorted(set(unknown_funcs)))})"
+            )
+
+        # Check for undefined symbols
         symbols = {str(sym) for sym in expr.free_symbols}
         unknown = sorted(
             symbol
@@ -261,11 +309,11 @@ async def EditorScreen(data: fr.DataSystem, themes):
                     "unit": _normalize_unit_for_eval(dep_pv.unit),
                 }
 
-            value, unit = evaluate(formula, variables, mode="auto")
+            value, unit = evaluate(formula, variables, operations=user_ops, mode="auto")
             if variable_type == VARIABLE_TYPE_BOOLEAN_FORMULA:
                 result_values.append(bool(value))
             else:
-                result_values.append(float(value))
+                result_values.append(value)
             result_unit = _normalize_unit_for_pool(unit)
 
         return result_values, result_unit
@@ -399,7 +447,17 @@ async def EditorScreen(data: fr.DataSystem, themes):
             return True
         except Exception as exc:
             if show_errors:
-                _show_formula_error(f"Error en variable derivada: {exc}")
+                msg = str(exc)
+                if "operaciones desconocidas" in msg:
+                    _show_formula_error(f"Fórmula inválida: {msg}")
+                elif "símbolos no definidos" in msg:
+                    _show_formula_error(f"Fórmula inválida: {msg}")
+                elif "operación desconocida" in msg.lower() or "unknown operation" in msg.lower():
+                    _show_formula_error(f"Fórmula inválida: {msg}")
+                elif "símbolo no definido" in msg.lower() or "undefined symbol" in msg.lower():
+                    _show_formula_error(f"Fórmula inválida: {msg}")
+                else:
+                    _show_formula_error(f"Error en variable derivada: {exc}")
             return False
 
     async def _handle_column_manage(variable_name: str, action: str):
@@ -422,6 +480,15 @@ async def EditorScreen(data: fr.DataSystem, themes):
                 themes=themes,
                 on_manage=_handle_column_manage,
                 shared=data.shared,
+            )
+        if is_formula_type(vt):
+            return FormulaColumn(
+                pool=pool,
+                current_name=name,
+                on_change=on_column_data_changed,
+                available_vars_getter=get_available_vars,
+                themes=themes,
+                on_manage=_handle_column_manage,
             )
         if is_boolean_type(vt):
             return BooleanColumn(
@@ -505,7 +572,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
         tab_names = _current_tab().get("columns", [])
         visible_ctrls = [
             c for c in columns_row.controls 
-            if isinstance(c, (EditableColumn, BooleanColumn, ComplexColumn, VectorColumn, MatrixColumn, PlotColumn))
+            if isinstance(c, (EditableColumn, BooleanColumn, ComplexColumn, VectorColumn, MatrixColumn, FormulaColumn, PlotColumn))
         ]
         
         visible_names = []
@@ -525,7 +592,8 @@ async def EditorScreen(data: fr.DataSystem, themes):
                 
                 # Mapeo de tipos a clases
                 expected_class = EditableColumn
-                if is_plot_type(vt):    expected_class = PlotColumn
+                if is_plot_type(vt):     expected_class = PlotColumn
+                elif is_formula_type(vt): expected_class = FormulaColumn
                 elif is_boolean_type(vt): expected_class = BooleanColumn
                 elif is_complex_type(vt): expected_class = ComplexColumn
                 elif is_vector_type(vt):  expected_class = VectorColumn
@@ -545,7 +613,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
         
         # Sincronizar cada columna con el pool (esto actualiza valores sin recrear el widget)
         for c in columns_row.controls:
-            if isinstance(c, (EditableColumn, PlotColumn, BooleanColumn, ComplexColumn, VectorColumn, MatrixColumn)):
+            if isinstance(c, (EditableColumn, PlotColumn, BooleanColumn, ComplexColumn, VectorColumn, MatrixColumn, FormulaColumn)):
                 c.sync_with_pool()
                 c._just_changed = False
         
@@ -720,6 +788,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
             update_shared_state=update_shared_state,
             themes=themes,
             on_manage=_handle_column_manage,
+            user_ops=user_ops,
         )
 
     data.shared["open_create_variable_modal"] = trigger_create_variable_modal

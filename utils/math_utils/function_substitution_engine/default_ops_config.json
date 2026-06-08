@@ -1,0 +1,142 @@
+[
+  {
+    "canonical": "sum",
+    "name": "sum",
+    "prefix_aliases": ["\\sum"],
+    "suffix_aliases": [],
+    "enabled": true,
+    "description": "Sum of values in a column or vector",
+    "notations": ["prefix sum(...)"],
+    "editable": true
+  },
+  {
+    "canonical": "mean",
+    "name": "mean",
+    "prefix_aliases": ["\\mean"],
+    "suffix_aliases": [],
+    "enabled": true,
+    "description": "Mean (average) of values in a column or vector",
+    "notations": ["prefix mean(...)"],
+    "editable": true
+  },
+  {
+    "canonical": "abs",
+    "name": "abs",
+    "prefix_aliases": ["absolute"],
+    "suffix_aliases": [],
+    "enabled": true,
+    "description": "Absolute value of a scalar or complex number",
+    "notations": ["surround |x| (via bar dispatcher)"],
+    "editable": true
+  },
+  {
+    "canonical": "sign",
+    "name": "sign",
+    "prefix_aliases": [],
+    "suffix_aliases": [],
+    "enabled": true,
+    "description": "Sign of a scalar or complex number (-1, 0, 1)",
+    "notations": ["prefix sign(...)"],
+    "editable": true
+  },
+  {
+    "canonical": "factorial",
+    "name": "factorial",
+    "prefix_aliases": ["\\factorial"],
+    "suffix_aliases": [],
+    "enabled": true,
+    "description": "Factorial of a non-negative integer",
+    "notations": ["postfix n! (built-in)"],
+    "editable": true
+  },
+  {
+    "canonical": "double_factorial",
+    "name": "double_factorial",
+    "prefix_aliases": [],
+    "suffix_aliases": [],
+    "enabled": true,
+    "description": "Double factorial n!!",
+    "notations": ["prefix double_factorial(...)"],
+    "editable": true
+  },
+  {
+    "canonical": "comb",
+    "name": "comb",
+    "prefix_aliases": [],
+    "suffix_aliases": [],
+    "enabled": true,
+    "description": "Combinations n choose k",
+    "notations": ["prefix comb(n, k)"],
+    "editable": true
+  },
+  {
+    "canonical": "combina",
+    "name": "combina",
+    "prefix_aliases": [],
+    "suffix_aliases": [],
+    "enabled": true,
+    "description": "Combinations with repetition",
+    "notations": ["prefix combina(n, k)"],
+    "editable": true
+  },
+  {
+    "canonical": "multinomial",
+    "name": "multinomial",
+    "prefix_aliases": [],
+    "suffix_aliases": [],
+    "enabled": true,
+    "description": "Multinomial coefficient",
+    "notations": ["prefix multinomial(k1, k2, ...)"],
+    "editable": true
+  },
+  {
+    "canonical": "gcd",
+    "name": "gcd",
+    "prefix_aliases": ["\\gcd"],
+    "suffix_aliases": [],
+    "enabled": true,
+    "description": "Greatest common divisor",
+    "notations": ["prefix gcd(a, b, ...)"],
+    "editable": true
+  },
+  {
+    "canonical": "lcm",
+    "name": "lcm",
+    "prefix_aliases": ["\\lcm"],
+    "suffix_aliases": [],
+    "enabled": true,
+    "description": "Least common multiple",
+    "notations": ["prefix lcm(a, b, ...)"],
+    "editable": true
+  },
+  {
+    "canonical": "det",
+    "name": "det",
+    "prefix_aliases": ["\\det", "mdeterm"],
+    "suffix_aliases": [],
+    "enabled": true,
+    "description": "Determinant of a square matrix",
+    "notations": ["surround |A| (built-in)"],
+    "editable": true
+  },
+  {
+    "canonical": "norm",
+    "name": "norm",
+    "prefix_aliases": [],
+    "suffix_aliases": [],
+    "enabled": true,
+    "description": "Norm (magnitude) of a vector or absolute value of a scalar",
+    "notations": ["surround |v| (via bar dispatcher)"],
+    "editable": true
+  },
+  {
+    "canonical": "bar",
+    "name": "bar",
+    "prefix_aliases": [],
+    "suffix_aliases": [],
+    "enabled": true,
+    "description": "Internal dispatcher: |x| routes to det/norm/abs depending on input type",
+    "notations": ["surround |x| (built-in)"],
+    "editable": false
+  }
+]

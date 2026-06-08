@@ -94,6 +94,8 @@ def check_type_compatibility(op: str | OperationSpec, operands: list[TypeDescrip
             return VARIABLE_TYPE_COLUMN_NO_ERROR
         if {left, right} <= {"scalar", "vector"}:
             return "vector"
+        if {left, right} <= {"scalar", "matrix"}:
+            return VARIABLE_TYPE_MATRIX
         if left == right == "column" or left == right == "vector":
             return VARIABLE_TYPE_COLUMN_NO_ERROR if left == "column" else "vector"
         if left == right == "matrix":
@@ -123,6 +125,10 @@ def check_type_compatibility(op: str | OperationSpec, operands: list[TypeDescrip
             return operands[0].type
         if left == "scalar" and right in {"column", "vector"}:
             return operands[1].type
+        if left == "matrix" and right == "scalar":
+            return VARIABLE_TYPE_MATRIX
+        if left == "scalar" and right == "matrix":
+            return VARIABLE_TYPE_MATRIX
         raise TypeMismatchError(f"Unsupported operand types for '/': {left}, {right}", op)
 
     if op == "^":

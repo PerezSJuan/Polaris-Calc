@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 import flet as ft
 from flet_base.translations import instance_translation_manager as tm
 import flet_base.components.texts as txt
