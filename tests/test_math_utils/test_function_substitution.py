@@ -16,7 +16,6 @@ from function_substitution_engine import (
     parse_latex_to_ast,
     parse_expression, 
     check_dimensions,
-    CONSTANTS,
     validate,
     DimensionMismatchError,
     ShapeMismatchError,
@@ -76,11 +75,6 @@ def test_evaluate_complex_expression():
     val, unit = evaluate("d / t", variables)
     assert val == 10.0
     assert "m" in unit and "s" in unit # Simplified to m/s or similar
-
-def test_builtin_constants():
-    assert "c" in CONSTANTS
-    assert CONSTANTS["c"][1] == "m/s"
-
 
 def test_evaluate_returns_eval_result_and_preserves_unpacking():
     result = evaluate("x + y", {"x": (2, "m"), "y": (3, "m")})

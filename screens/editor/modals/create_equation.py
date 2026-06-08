@@ -26,7 +26,7 @@ from screens.editor.modals.utils import (
     _card,
     _parse_name_unit,
 )
-from function_substitution_engine import CONSTANTS, parse_expression, DEFAULT_OPERATIONS
+from function_substitution_engine import parse_expression, DEFAULT_OPERATIONS
 
 _FORMULA_TYPES = [
     VARIABLE_TYPE_FORMULA_NO_ERROR,
@@ -75,9 +75,8 @@ def _check_formula(formula: str, pool_keys: set[str], user_ops: dict | None = No
 
     # Check for undefined variables
     pool_set = set(pool_keys)
-    const_set = set(CONSTANTS.keys())
     symbols = {str(sym) for sym in expr.free_symbols}
-    undefined = sorted(symbols - pool_set - const_set)
+    undefined = sorted(symbols - pool_set)
     for sym in undefined:
         errors.append(f"Símbolo no definido: '{sym}'")
 

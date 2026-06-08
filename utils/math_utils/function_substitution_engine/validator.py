@@ -3,7 +3,7 @@ from __future__ import annotations
 from .ast_nodes import AddNode, CompareNode, FuncNode, MulNode, NumberNode, PowNode, SymbolNode
 from .eval_types import ValidationIssue, ValidationReport
 from .parser import parse_expression
-from .pool_schema import normalize_builtin_constants, normalize_extra_constants, normalize_operations, normalize_variables
+from .pool_schema import normalize_extra_constants, normalize_operations, normalize_variables
 from .resolver import resolve_node
 from .type_checker import TypeDescriptor, check_type_compatibility, descriptor_from_pool_value
 from .units import get_dim, same_dim
@@ -29,7 +29,6 @@ def validate(
     warnings: list[ValidationIssue] = []
     normalized_variables = normalize_variables(variables)
     normalized_constants = normalize_extra_constants(extra_constants)
-    normalized_builtin = normalize_builtin_constants()
     normalized_operations = normalize_operations(operations)
 
     try:
@@ -44,7 +43,7 @@ def validate(
             return TypeDescriptor(type="constant_no_error", unit="1")
         if isinstance(node, SymbolNode):
             try:
-                resolved = resolve_node(node, normalized_variables, normalized_constants, normalized_builtin, normalized_operations)
+                resolved = resolve_node(node, normalized_variables, normalized_constants, normalized_operations)
             except Exception as exc:
                 code = getattr(exc, "code", "EVAL_ERROR")
                 errors.append(_error(code, str(exc), str(node)))
@@ -52,7 +51,7 @@ def validate(
             return descriptor_from_pool_value(resolved.symbol)
         if isinstance(node, FuncNode):
             try:
-                resolved = resolve_node(node, normalized_variables, normalized_constants, normalized_builtin, normalized_operations)
+                resolved = resolve_node(node, normalized_variables, normalized_constants, normalized_operations)
             except Exception as exc:
                 code = getattr(exc, "code", "EVAL_ERROR")
                 errors.append(_error(code, str(exc), str(node)))

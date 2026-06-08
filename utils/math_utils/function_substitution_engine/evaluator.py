@@ -19,7 +19,6 @@ from .pool_schema import (
     PoolValue,
     canonical_type,
     infer_shape,
-    normalize_builtin_constants,
     normalize_extra_constants,
     normalize_operations,
     normalize_variables,
@@ -251,7 +250,6 @@ def evaluate_node(node: ResolvedNode) -> EvalResult:
 def check_dimensions(expr, variables: dict, extra_constants: dict | None = None, operations: dict | None = None) -> str:
     normalized_variables = normalize_variables(variables)
     normalized_constants = normalize_extra_constants(extra_constants)
-    normalized_builtin = normalize_builtin_constants()
     normalized_operations = normalize_operations(operations)
     operation_names = list(normalized_operations.keys())
 
@@ -261,7 +259,7 @@ def check_dimensions(expr, variables: dict, extra_constants: dict | None = None,
     else:
         ast = _sympy_to_ast(expr)
 
-    resolved = resolve_node(ast, normalized_variables, normalized_constants, normalized_builtin, normalized_operations)
+    resolved = resolve_node(ast, normalized_variables, normalized_constants, normalized_operations)
 
     def walk(resolved_node: ResolvedNode) -> str:
         if isinstance(resolved_node.node, NumberNode):
@@ -319,11 +317,6 @@ def check_dimensions(expr, variables: dict, extra_constants: dict | None = None,
     return walk(resolved)
 
 
-def constant_in_system(name: str, target_unit: str):
-    result = evaluate(name, {}, target_unit=target_unit)
-    return result.value, result.unit
-
-
 def evaluate(
     expr: str,
     variables: dict,
@@ -334,7 +327,6 @@ def evaluate(
 ) -> EvalResult:
     normalized_variables = normalize_variables(variables)
     normalized_constants = normalize_extra_constants(extra_constants)
-    normalized_builtin = normalize_builtin_constants()
     normalized_operations = normalize_operations(operations)
 
     operation_names = list(normalized_operations.keys())
@@ -344,7 +336,7 @@ def evaluate(
         sympy_expr = parse_expression(expr, mode=mode, operation_names=operation_names)
         ast = _sympy_to_ast(sympy_expr)
 
-    resolved = resolve_node(ast, normalized_variables, normalized_constants, normalized_builtin, normalized_operations)
+    resolved = resolve_node(ast, normalized_variables, normalized_constants, normalized_operations)
     result = evaluate_node(resolved)
     if target_unit:
         result = convert_result_unit(result, target_unit)

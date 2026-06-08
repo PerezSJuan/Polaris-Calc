@@ -19,7 +19,6 @@ from .variable_types_compat import (
     VARIABLE_TYPE_MATRIX,
     VARIABLE_TYPE_VECTOR,
 )
-from .default_constants import CONSTANTS
 from .default_operations import DEFAULT_OPERATIONS, OperationSpec
 
 SCALAR_TYPES = {
@@ -155,18 +154,6 @@ def normalize_extra_constants(extra_constants: dict | None) -> dict[str, PoolVal
         else:
             normalized[name] = normalize_variable_entry(name, entry)
     return normalized
-
-
-def normalize_builtin_constants() -> dict[str, PoolValue]:
-    return {
-        name: PoolValue(
-            name=name,
-            type=VARIABLE_TYPE_CONSTANT_NO_ERROR,
-            value=float(value.evalf()) if hasattr(value, "evalf") else float(value),
-            unit=unit,
-        )
-        for name, (value, unit) in CONSTANTS.items()
-    }
 
 
 def normalize_operations(operations: dict | None) -> dict[str, OperationSpec]:

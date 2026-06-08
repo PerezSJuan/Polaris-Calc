@@ -19,7 +19,7 @@ math_utils_path = os.path.abspath(
 if math_utils_path not in sys.path:
     sys.path.append(math_utils_path)
 
-from function_substitution_engine import CONSTANTS, evaluate, parse_expression, resolve_pool_variable, DEFAULT_OPERATIONS
+from function_substitution_engine import evaluate, parse_expression, resolve_pool_variable, DEFAULT_OPERATIONS
 from function_substitution_engine.ops_config import OperationNamingConfig, build_user_operations, _load_overrides
 
 from screens.editor.utils.utils import normalize_editor_data
@@ -261,7 +261,7 @@ async def EditorScreen(data: fr.DataSystem, themes):
         unknown = sorted(
             symbol
             for symbol in symbols
-            if symbol not in pool and symbol not in CONSTANTS
+            if symbol not in pool
         )
         if unknown:
             raise ValueError(
